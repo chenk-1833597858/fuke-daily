@@ -1,0 +1,7 @@
+{
+  "versionCode": 3,
+  "versionName": "1.2.0",
+  "apkUrl": "http://101.33.200.139:15839/fuke-daily/app-release.apk",
+  "updateLog": "1. 新增App自动更新检查\n2. 修复已知问题",
+  "forceUpdate": false
+}
