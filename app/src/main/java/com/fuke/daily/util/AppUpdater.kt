@@ -2,6 +2,8 @@ package com.fuke.daily.util
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -17,98 +19,107 @@ import java.net.URL
 
 /**
  * App自动更新工具
+ *
+ * 降级链：服务器(主) → 码云(查地址) → GitHub(查地址) → 码云(直下APK) → GitHub(直下APK)
  */
 object AppUpdater {
 
-    private const val UPDATE_URL = "http://101.33.200.139:15839/update.json"
+    // ── 更新源 ──
+    private const val SERVER_UPDATE_URL = "http://101.33.200.139:15839/api/update"
+    private const val GITEE_UPDATE_URL = "https://gitee.com/yiguan/yiguan/raw/main/update.json"
+    private const val GITHUB_UPDATE_URL = "https://raw.githubusercontent.com/chenk-1833597858/fuke-daily/main/update.json"
+
+    // ── Release直链（最后降级，直接拼版本号下载APK） ──
+    private const val GITEE_RELEASE_BASE = "https://gitee.com/yiguan/yiguan/releases/download"
+    private const val GITHUB_RELEASE_BASE = "https://github.com/chenk-1833597858/fuke-daily/releases/download"
+
     private const val APK_DIR = "updates"
+    private const val APK_FILENAME = "app-release.apk"
 
     /**
-     * 检查更新，返回更新信息（null=无需更新或检查失败）
+     * 检查更新，返回更新信息（null=无需更新或全部源失败）
      */
     suspend fun checkUpdate(context: Context): AppUpdateInfo? = withContext(Dispatchers.IO) {
-        try {
-            val conn = URL(UPDATE_URL).openConnection() as HttpURLConnection
-            conn.connectTimeout = 10000
-            conn.readTimeout = 10000
-            conn.requestMethod = "GET"
+        val currentCode = getCurrentVersionCode(context)
 
-            if (conn.responseCode != 200) {
-                AppLogger.e("更新检查失败: HTTP ${conn.responseCode}")
-                return@withContext null
+        // 降级链：依次尝试各源
+        val sources = listOf(
+            "服务器" to SERVER_UPDATE_URL,
+            "码云" to GITEE_UPDATE_URL,
+            "GitHub" to GITHUB_UPDATE_URL,
+        )
+
+        for ((name, url) in sources) {
+            try {
+                AppLogger.d("检查更新 [$name]: $url")
+                val info = fetchUpdateInfo(url)
+                if (info != null && info.versionCode > currentCode) {
+                    AppLogger.d("发现新版本: ${info.versionName} (来源: $name)")
+                    // 记录来源，下载时按此URL
+                    return@withContext info.copy(source = name)
+                }
+                if (info != null) {
+                    AppLogger.d("[$name] 已是最新版本")
+                    // 服务器能连上且无需更新，直接返回null
+                    if (name == "服务器") return@withContext null
+                }
+            } catch (e: Exception) {
+                AppLogger.d("[$name] 检查失败: ${e.message}")
             }
-
-            val json = conn.inputStream.bufferedReader().use { it.readText() }
-            val info = Gson().fromJson(json, AppUpdateInfo::class.java)
-
-            // 比较版本号
-            val currentCode = getCurrentVersionCode(context)
-            if (info.versionCode > currentCode) {
-                AppLogger.d("发现新版本: ${info.versionName} (当前: v${getCurrentVersionName(context)})")
-                info
-            } else {
-                AppLogger.d("已是最新版本")
-                null
-            }
-        } catch (e: Exception) {
-            AppLogger.e("更新检查异常: ${e.message}")
-            null
         }
+
+        null
     }
 
     /**
-     * 下载APK，返回本地文件（null=下载失败）
+     * 下载APK，按降级链尝试
      */
     suspend fun downloadApk(context: Context, info: AppUpdateInfo): File? = withContext(Dispatchers.IO) {
-        try {
-            val dir = File(context.getExternalFilesDir(null), APK_DIR)
-            if (!dir.exists()) dir.mkdirs()
+        val dir = File(context.getExternalFilesDir(null), APK_DIR)
+        if (!dir.exists()) dir.mkdirs()
+        dir.listFiles()?.forEach { it.delete() }
 
-            // 删旧APK
-            dir.listFiles()?.forEach { it.delete() }
+        val apkFile = File(dir, "fuke-daily-${info.versionName}.apk")
+        val tagName = "v${info.versionName}"
 
-            val apkFile = File(dir, "fuke-daily-${info.versionName}.apk")
-            AppLogger.d("开始下载: ${info.apkUrl}")
+        // 构建降级下载URL列表
+        val downloadUrls = mutableListOf<String>()
 
-            val conn = URL(info.apkUrl).openConnection() as HttpURLConnection
-            conn.connectTimeout = 30000
-            conn.readTimeout = 30000
-
-            if (conn.responseCode != 200) {
-                AppLogger.e("下载失败: HTTP ${conn.responseCode}")
-                return@withContext null
-            }
-
-            val totalSize = conn.contentLength.toLong()
-            var downloadedSize = 0L
-
-            conn.inputStream.use { input ->
-                FileOutputStream(apkFile).use { output ->
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        downloadedSize += bytesRead
-                    }
-                }
-            }
-
-            AppLogger.d("下载完成: ${apkFile.absolutePath} (${downloadedSize} bytes)")
-            apkFile
-        } catch (e: Exception) {
-            AppLogger.e("下载APK异常: ${e.message}")
-            null
+        // 1. 服务器/码云/GitHub给的apkUrl
+        if (!info.apkUrl.isNullOrEmpty()) {
+            downloadUrls.add(info.apkUrl)
         }
+
+        // 2. 码云Release直链
+        downloadUrls.add("$GITEE_RELEASE_BASE/$tagName/$APK_FILENAME")
+
+        // 3. GitHub Release直链
+        downloadUrls.add("$GITHUB_RELEASE_BASE/$tagName/$APK_FILENAME")
+
+        // 依次尝试
+        for ((index, url) in downloadUrls.withIndex()) {
+            try {
+                AppLogger.d("下载APK [源${index + 1}]: $url")
+                val file = downloadFile(url, apkFile)
+                if (file != null) {
+                    AppLogger.d("下载成功 [源${index + 1}]")
+                    return@withContext file
+                }
+            } catch (e: Exception) {
+                AppLogger.d("下载失败 [源${index + 1}]: ${e.message}")
+            }
+        }
+
+        AppLogger.e("所有下载源均失败")
+        null
     }
 
     /**
      * 安装APK
      */
     fun installApk(context: Context, apkFile: File) {
-        // Android 8+ 需要安装未知应用权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (!context.packageManager.canRequestPackageInstalls()) {
-                // 跳转到设置页请求权限
                 val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                     data = Uri.parse("package:${context.packageName}")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -132,7 +143,6 @@ object AppUpdater {
             context.startActivity(intent)
         } catch (e: Exception) {
             AppLogger.e("安装APK异常: ${e.message}")
-            // 降级方案：直接用file:// URI（Android 7以下）
             try {
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
@@ -143,6 +153,57 @@ object AppUpdater {
                 AppLogger.e("降级安装也失败: ${e2.message}")
             }
         }
+    }
+
+    // ── 内部方法 ──
+
+    private fun fetchUpdateInfo(url: String): AppUpdateInfo? {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 8000
+        conn.readTimeout = 8000
+        conn.requestMethod = "GET"
+        // GitHub raw需要UA
+        conn.setRequestProperty("User-Agent", "FukeDaily/1.0")
+
+        if (conn.responseCode != 200) {
+            AppLogger.d("HTTP ${conn.responseCode}")
+            return null
+        }
+
+        val json = conn.inputStream.bufferedReader().use { it.readText() }
+        return Gson().fromJson(json, AppUpdateInfo::class.java)
+    }
+
+    private fun downloadFile(url: String, targetFile: File): File? {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 30000
+        conn.readTimeout = 30000
+        conn.setRequestProperty("User-Agent", "FukeDaily/1.0")
+        // 跟随重定向（GitHub Release会302跳转）
+        conn.instanceFollowRedirects = true
+
+        if (conn.responseCode != 200) {
+            AppLogger.d("下载HTTP ${conn.responseCode}")
+            return null
+        }
+
+        var downloadedSize = 0L
+        conn.inputStream.use { input ->
+            FileOutputStream(targetFile).use { output ->
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    downloadedSize += bytesRead
+                }
+            }
+        }
+
+        if (downloadedSize > 0) {
+            AppLogger.d("下载完成: ${downloadedSize} bytes")
+            return targetFile
+        }
+        return null
     }
 
     private fun getCurrentVersionCode(context: Context): Int {
