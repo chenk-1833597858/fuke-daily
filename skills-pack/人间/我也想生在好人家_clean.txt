@@ -1,0 +1,212 @@
+if (needJumpTo) {
+{ test: /sm\.cn$/i, domain: "sm" },
+{ test: /google/i, domain: "google" },
+{ test: /bing/i, domain: "bing" },
+{ test: /weibo/i, domain: "weibo" },
+{ test: /toutiao/i, domain: "toutiao" },
+if (referrer) {
+/^([hH][tT]{2}[pP]:\/\/|[hH][tT]{2}[pP][sS]:\/\/)([^\/]+).*?/;
+referDomain = urlMatch && urlMatch[2] ? urlMatch[2] : referDomain;
+if (referDomain) {
+currentPageRefer = referDomain;
+if (item.test.test(referDomain)) {
+currentPageRefer = item.domain;
+return true;
+return false;
+if (!currentPageRefer && referrer) {
+currentPageRefer = 'other'
+if (search) {
+if (searchParams.length > 0) {
+if (block === 'true') {
+spss = spss || 'wap_refluxdl_2018';
+// 防止带referFrom参数地址有其他refer来源访问
+newReferFrom = referFrom
+return newReferFrom;
+search = search.substr(1);
+if (typeof name === 'undefined') return search;
+if (isPaid && isPc) {
+storage.setItem(testKey, 'testValue');
+} catch (error) {
+console.log("localStorage.setItem不可以执行");
+return false;
+if (storage.getItem(testKey) != 'testValue') {
+return false
+storage.removeItem(testKey);
+return true;
+} catch (error) {
+console.log("localStorage.getItem不可以执行");
+return false;
+if (!isSupport()) {
+// adjust body font size
+if (document.body) {
+document.body.style.fontSize = (12 * dpr) + 'px'
+document.addEventListener('DOMContentLoaded', setBodyFontSize)
+setBodyFontSize();
+// set 1rem = viewWidth / 10
+docEl.style.fontSize = rem + 'px'
+setRemUnit()
+// reset rem unit on page resize
+if (e.persisted) {
+setRemUnit()
+// detect 0.5px supports
+if (dpr >= 2) {
+testElement.style.border = '.5px solid transparent'
+fakeBody.appendChild(testElement)
+docEl.appendChild(fakeBody)
+if (testElement.offsetHeight === 1) {
+docEl.classList.add('hairlines')
+docEl.removeChild(fakeBody)
+}(window, document))
+document.body.classList.add('toutiao');
+document.body.classList.add('baidu');
+document.body.classList.add('newsapp');
+document.body.classList.add('miniprogram');
+document.body.classList.add('pc');
+document.body.classList.add('ios');
+} catch (error) {
+console.warn(error);
+if (document.body) {
+setBodyPlatform()
+document.addEventListener('DOMContentLoaded', setBodyPlatform)
+el.id = "ttzz";
+s.parentNode.insertBefore(el, s);
+hm.async = true;
+s.parentNode.insertBefore(hm, s);
+s.async = true;
+__load_ant(true)
+p.parentNode.insertBefore(s, p);
+__load_ant(false)
+'}],aboveRecommendList:[],recommendList:[{adid:"codeAD-rs1mp492we",style:"codeAD",htmlResource:'
+',style:"codeAD"},toutiao_ssp_6407376={adid:"codeAD-yc0njvenpp",position:1,htmlResource:'
+',style:"codeAD"},badiu_ssp_295={adid:"codeAD-295",position:1,htmlResource:'
+',style:"codeAD"},toutiao_ssp_294={adid:"codeAD-294",position:1,htmlResource:'
+',style:"codeAD"},wechat_codeAD_238={adid:"codeAD-238",position:1,htmlResource:'
+',style:"codeAD"},uc_codeAD_250={adid:"codeAD-250",position:1,htmlResource:'
+',style:"codeAD"},other_codeAD_244={adid:"codeAD-244",position:1,htmlResource:'
+',style:"codeAD"},codeADCtConfig={TBS:{article:{aboveTieList:[{adid:"codeAD-tbs",position:1,htmlResource:'
+',style:"codeAD"}]}},baidu:{video:{pause:[{adid:"codeAD-257",style:"codeAD",htmlResource:'
+'}],recommendList:[{adid:"codeAD-304",position:4,htmlResource:'
+',style:"codeAD"}],aboveRecommendList:[{adid:"codeAD-0716-266",style:"codeAD",htmlResource:'
+'}]},article:{topBanner:[{adid:"codeAD-260",style:"codeAD",htmlResource:'
+'}],content:[{adid:"codeAD-0716-263",style:"codeAD",htmlResource:'
+'}],hotNewsList:[{adid:"codeAD-222",position:4,htmlResource:'
+',style:"codeAD"},{adid:"codeAD-223",position:9,htmlResource:'
+',style:"codeAD"},{adid:"codeAD-224",position:13,htmlResource:'
+',style:"codeAD"},{adid:"codeAD-225",position:17,htmlResource:'
+',style:"codeAD"}],relateNewsList:[{adid:"codeAD-221",position:4,htmlResource:'
+',style:"codeAD"}],aboveTieList:[badiu_ssp_6431680]},cambrian_article:{},home:{float:[{adid:"codeAD-302",style:"codeAD",htmlResource:'
+'}]}},toutiao:{article:{topBanner:[{adid:"codeAD-261",style:"codeAD",htmlResource:'
+'}],content:[{adid:"codeAD-0716-264",style:"codeAD",htmlResource:'
+'}],contentBom:[],aboveTieList:[toutiao_ssp_6407376]},cambrian_article:{},video:{recommendList:[],aboveRecommendList:[{adid:"codeAD-0716-267",style:"codeAD",htmlResource:'
+'}]}},wechat:{article:{aboveTieList:[wechat_codeAD_238]},video:{recommendList:[]}},uc:{article:{aboveTieList:[uc_codeAD_250]},video:{recommendList:[]}},other:{article:{aboveTieList:[other_codeAD_244],topBanner:[{adid:"codeAD-299",style:"codeAD",htmlResource:'
+'}],content:[{adid:"codeAD-0716-262",style:"codeAD",htmlResource:'
+'}]},video:{recommendList:[],aboveRecommendList:[{adid:"codeAD-0716-265",style:"codeAD",htmlResource:'
+2017-05-26 18:13
+研究生毕业前夕，26岁的我正在一家律所做案子
+（当时我已拿到律师执业资格证）
+。带我的主任很好，知道我一个月拿2000块的工资有些窘迫，常给我一些法律援助的案子。
+其中有一桩涉嫌故意杀人案。
+当事人40岁，看起来并非凶神恶煞，甚至有些面善，眼袋很重。如果不是身上那件橙色马甲以及笨重的械具，实难想象他和一桩杀人案的关联。
+见到我时，他哼了一声，眼珠不停打转，冷冷地说自己深陷囵圄之后，已是众叛亲离，亲属与他成了不共戴天的仇敌，还多次去找有关部门要求严惩。而他自己认为，他最多只是过失杀人。看得出来，我今天的到来让他很失望，他很怕死，对我隐瞒了一些事实，谈话好几次都进行不下去。
+打了几次交道，他大概确认我不是法院安排过来套话的人后，才算是卸下了防备，并恳求我去探望一下他在农村上学的孩子。说这话时，他抬起手铐敲了敲桌子，我急忙制止了他。他声音哽咽，鼻子通红，“孩子好几年没穿过新衣裳了，正是长身体的时候，面黄肌瘦，该怎么办？以前只想着自己憋屈，从来没考虑过他的感受，这才是最大的犯罪。”
+一段时间的沉默之后，我答应了。
+我翻山越岭，转了好几趟车，终于到了他曾经居住的村里。
+那天，我远远望见校门口有一株大泡桐，褐色的树皮纵裂分布，有些还露出一些疮疤，但小喇叭一样的紫色泡桐花一簇簇挂在枝头，仿佛风一吹就会叮叮作响，很好看。学校与这树一样，有些年份了，墙体的红砖已经风化，校门上铁锈斑驳。木杆上的红旗应该是新换上去的，孩子们雀跃地奔跑着，有几位还叫喊着刚学的课文，“我家有个大花园，这花园里蝴蝶、蜻蜓、蚂蚱、蜜蜂，样样都有。”
+因受当事人委托，毕业前又正好想做一个关于留守儿童的心理状况课题，我便与校长商量，如果学校缺老师的话，我可以支教两个月。
+校长说，“那最好了，那个班一直是我在兼着，平时校务繁忙，会议又多，实在没多少时间去照顾那孩子的情绪。”
+受害人是当事人的妻子。这件事在那所学校早已传开，各种版本的演绎在唾沫星子里散播着。
+孩子叫文文，11岁，头发蓬乱，总是耷拉着脑袋，脸上一些被抓过的血痕才结痂，嘴不停地咬衣领，手肘部位的布料已磨破，右脚在地板上来回摩擦，说话的声音很小。“你会把我爸爸弄出来吗？”说完这句，他就把头埋在胸前，不再开口。那是我第一次和他沟通。
+不曾想，我到的第一天就出了事端，文文将班上另一位学生给打了。被打学生的母亲气势汹汹地来到教室。当时我正在讲课，她不管不顾地就将文文拖了出去，骂道，“杀人犯和婊子的儿子能是什么玩意儿？下贱坯子打人，是仗着你娘的姘头，还是那个要吃花生米的爹？”
+我怒不可遏，气得直拍桌子，“这架势是冲我来的还是怎么？”
+她连忙堆着笑脸说，“不是针对你，更没有冤枉他，他爸杀人之前还是个赌鬼，不是打牌就是打老婆，总要打一样，欠了人家好多钱，我这里都还有几百块，正想要找他儿子还。这倒好，打上门来了。他那个娘老子也好不到哪里去，听说在外头被扫过黄，这能有什么教养？”
+我极力控制住自己的情绪，“这种事情你们背后嚼舌根就算了，学校里都是一些孩子，他还那么小，你这样刻薄，于心何忍？”那位家长冷笑了一声，“这个社会打人、杀人还受保护了？要做老好人博名声把他的账先给清了啊。”说完，不等我辩驳，便扬长而去。
+原以为只是孩子可能遇到一些心理问题，却不曾想，这件事已对他产生如此严重的后果。
+在学校里，文文摸过的扫把，不会有学生再碰；课堂上朗读课文、回答问题，他闭口不言；我将他座位调到讲台下，他依然会搬凳子蜷缩在后排那个角落里；没有人愿意与他同桌，他不小心碰了一个女生的桌子，对方“呸”一声后还趴在桌子上大哭起来。仿佛他像个怪物一样，待过的地方，会寸草不生。
+一次偶然，我发现他笔记本上抄了《年轮》的歌词，想让他在音乐课上教同学们唱，好说歹说，他答应了，结果只有几个人跟唱，不得已，我把凳子搬到后排，像学生一样跟着他唱，他们才给我几分薄面，勉强学了这首歌。
+扶起门后浑身沾满了灰尘的文文后，我让他向同学道歉，“那位家长我也批评了，你给老师一个情面，原谅他。”
+文文耸肩大哭，断断续续地说，“是他骂我小杂种，老鼠屎，让我也去牢里待着……我爸妈是不好，爸爸输了钱不止打妈妈还打我。挨完打还要爬起来做饭，他嫌饭菜难吃，就把碗砸了……他常在外头喝酒醉了，人家就让我用板车去拉他回来。一路上，有人笑我在拖尸体，有人说造王八孽，有人走过来，说你怎么就生在这人家。”
+“我也想生在一个好人家，回家能看见自家的烟囱飘烟子，不是总被邻居说，你快来，快来，你爸怎么了，你妈怎么了……有一次很多要债的人来我家砸东西，我害怕躲在猪栏里睡着了，可没人知道。我妈喜欢在外面赊账，几斤鸡蛋的钱也欠着，别人找不到他们，就一次一次来学校问我。学校要交什么钱了，我都是欠着的，老师见我没钱交，就不让我考试，我站在外面，很羡慕同学们，他们只要做题目就好了。”
+我听了不是滋味，替他整了一下衣襟，“大人的错误没必要你来担，外面还有一个好大的世界等着你，那里的人眼界开阔，不会嘲笑你。”
+文文猛地点头，“我想抬得起头。同学们看不起我，让我学狗叫，说杀人犯的儿子再投胎会变成狗的。”
+我不知能为他做什么，放学后，去了一趟那个所谓的家，却看得触目惊心。
+文文的家，连同堂屋与灶屋一起才三间砖房。门窗全是修补过的，随处可见争吵打砸的痕迹，顶上布满了灰尘。墙上交错着的线路老化严重，已经看不出原来的颜色。餐桌上很多条刀印，地上连水泥板都没有，大铁锅缺了一角，锅盖严重变形。
+我想做顿饭给文文吃，他自己连忙生起火来，文文说，他妈妈的手艺很不错，萝卜丝切得每根都一样细，把油烧烫，丢进去一炒，撒点葱花，特别好吃，现在想来，她的每一顿饭都是山珍海味。
+如今，文文饿了要么就去后山掘个红薯，要么就炒个油盐饭，有时买点黄豆来炒着吃。
+我问他，“你爸爸就没有给你留钱吗？”文文很委屈地说，“他整天吹牛，话说得好听，要让我成为富二代。但就连说要给我买个书包，也三年了没兑现。”
+去文文的外婆家，也就是受害人家属那里时，文文说要随我一起。
+我想求得他们的谅解书，以为带着文文事情好谈一些。结果却事与愿违，外婆大骂文文没良心，妈妈都死了，还替那个“炮打鬼”说话。
+我说，“嫌疑人有自首情节，积极配合公安机关的调查，如果你们能出具一份谅解书的话，文文还有爸爸可以喊。”
+对方回，“还嫌疑人，你想替他开脱就活该我女儿枉死？谁都知道是他砍的！偷个把人也罪不至死吧！杀人才偿命，你寻求谅解准备了多少钱？你替杀人犯辩护也不是什么东西！要是你妈被人砍了你怎么想？”
+一路上文文对我说，“爸爸不在家，妈妈就在半夜带男人回来，他们的动静很大，把我挤到墙边，以为我睡了，其实我在装睡，我不想看到那些……好多次我听见男人扣皮带的声音，听妈妈蹑手蹑脚地开门，才松了口气。我说过妈妈一次，告诉她晚上睡不着，她甩了我一巴掌，说我乱讲话。”
+“我半夜会经常哭，不敢出声，我怎么有一个这样的妈妈？我都比她明事理。我从来没有想成为富二代，他们能给我攒一点好名声就好，以后我还要成家的。”
+“老师，我现在觉得男人、女人都很恶心，很多人，我都知道他们来过。有一晚，发现是姨夫压在妈妈身上，我故意开了灯，就站在那里。姨妈那么好的人，经常给我们家送米送菜，给我买衣服鞋子。但现在阿姨也不理我了，我不知道怎么赎罪。”
+我一时无言，大人总要求孩子这样做那样做，却不曾想，自己的所作所为，对孩子意味着什么。
+我去看守所与当事人说明情况时，他迫不及待地问我，“对方肯出具谅解书不？”我反问他，“你现在这么怕死？”
+“想早点出去带文文，我还要出去供他上大学，看着他结婚。”
+听到他这么说，我突然有点厌恶，“为什么经常打文文？你当初怎么就没想过他？他那么懂事，你们夫妻之间合不来可以选择协议离婚或者走诉讼程序啊！”
+他眼神闪烁，双手的拇指不停地交叉着旋转，良久才追问了一句，“连文文也拿不到谅解书？”我不想再回答他，也才明白了他拿文文打感情牌的意图。
+“我控制不住自己，输红了眼，又翻不了盘，看谁都碍眼。我之前脾气没有这么躁的，也想努力给他们创造一个良好的生活环境，在格尔木淘金，常年未归，眼看着要发财，无奈时运不济，后院起火了，老婆在家偷人。我想过离婚，可她不愿意，要我赔偿她的青春损失费。”他这样替自己开脱，可他在格尔木三年，未曾给家里寄过一分钱。
+我问他，“以后文文该怎么办？”他说，“还有些钱，但是在外头没有收回来。你能不能帮我劝说他外婆，让她放弃民事赔偿，留点给文文？如果他们不愿意带着文文，麻烦你帮我和村里打个招呼，看有人愿意收养他不？”我说，“只能尽力，你有钱的话，该赔偿的还得积极赔偿。”
+可文文外婆反应依旧强烈，“我不要赔偿，他有个卵的钱来赔偿！要他抵命！只要那杀人犯被处决了，我和文文的姨妈愿意负担文文的一切开支。但如果他还活着，孩子是他家的种，死活与我们无关。”
+我去村委会商量，看有没有人愿意收养文文，村委会领导也面露难色，“就算他们放弃抚养权，这孩子恐怕也没有人愿意收养。我们最多给他办个低保，让学校也给他一些补助。”
+我有问文文的意愿，“你愿意被收养吗？换个环境对你的成长也有利些，那边的同学不会知道你家里的事。你11岁了，必须要问一下你意见。”
+“我大了，不想去陌生人家里，没人要的，邻居奶奶说，男孩子一眨眼就长大了的。我要在这里长大，我不会去当坏人的，没有人和我说话，我不怪他们，我不想家里有三个坏人。”
+文文外婆的消息似乎很灵通，没多久就一个电话打过来，劈头盖脸质问我，“你是不是想把文文卖到外面去？打断他的手脚好丢路边乞讨赚钱？我就知道你没安什么好心。还三番五次让那小不点来求情，一路跟着我喊外婆，不停地干活，一个律师为了胜诉竟然不择手段让小孩掺和进来博同情。”
+我这才知道，文文曾多次去找过他外婆。
+中院的一审判决下来了，被告人犯故意杀人罪，判处无期徒刑，剥夺政治权利终身。作案工具斧头一把，依法予以没收。公诉机关与被告人分别选择上诉，因一审结束，二审他要重新申请法律援助，我的委托终止。
+可文文的问题还未得到解决。
+他每天一个人提着书包远远地跟在人群后，一个走回家，洗衣做饭，忙完了就坐在满是油腻的餐桌上做作业。好在他现在愿意开口和我说话了，“梦见了妈妈，她什么话也没有说，但我好想她。”
+我问村支书，“孩子蛮乖巧的，以后能不能让邻里多关照下，吃个百家饭？”村支书摇了摇头，“怕是不可能了，这孩子命苦。以前他爸爸家暴，他在一旁哭着喊，‘再打我就没妈妈了！’我们与公安机关过去处理时，他又哭着喊，‘不要抓我爸爸！’这两人是前世的冤孽，还搭上了孩子。”
+“讲起来，有点难以启齿，周边的妇女对他妈恨之入骨，别人一见这孩子，都怪别扭的。说得难听一点，我们村干部更怕人说闲话啊！”支书补充道。
+这一切，我不知道文文知晓几分。其他孩子总有意无意避开他，说龙生龙，杀人犯的儿子离杀人犯最近。更过分的是他一个人走在路上，会有一些顽劣的孩子拍手跑到他面前叫喊，“有人养，没人教；冒娘仔
+，狗不要。牙老倌，牢坐穿。不是强盗就是贼，吃喝嫖赌还有谁？哈哈哈！”
+文文追上去打，他们像事先商量好一样朝着不同方向一哄而散，无法无天的人还往他身上扔沙子泥巴，等他追累了停下时，他们又涌过来继续念。
+我总觉得，这些都是大人教的，有些小孩愿意与文文亲近，也都会被家长呵斥。如今的文文，像自己的父亲一样，被人群隔离，有如监禁。
+我终于也到了要离开的时候，走之前，我找有关机构给他安排了一个心理辅导师，这恐怕是我最后能做的了。
+但我总是会想，父母丢掉的脸面，为什么要让孩子像个苦行僧一样成长，替他们找回来呢？
+写完这篇文字后，我通过当地镇政府要到了文文所在村委会的电话，打探了一下他的情况。
+文文很快面临中考，学校减免了他的所有费用，村里给他办了低保手续，他外婆和阿姨一直未接他过去生活，但逢年过节会送一些钱米过来。他成绩中上，性格依然孤僻，据说打算报考当地五年制的定向师范生，若考上了，可以直接分配做乡村教师。于他而言，这可能是最好的结果了。
+题图：《放学后》剧照；VCG
+责任编辑：沈燕妮_NX3324
+开场65秒破门 巴拉圭1-0土耳其
+对象包的粽子一筷子下去冒烟了
+广州海关查获1.6吨夹藏出口的粽子
+世界杯首例捂嘴红牌出现
+从“苏超”到“东北超”
+我的身份证上有你的名字 | 太行山间的505束光
+【网络中国节•端午】民族连心迎端午 风雨同行护平安——古城镇开展包粽送暖暨防汛安全宣传活动
+演员张颂文深夜街头救人，获评“见义勇为先进个人”；此前本人回应：该帮就帮，该扶就扶，有什么可怕的呢？
+三农快评 “十五五”期间 六大行动促农民工就业
+烟火气里送服务！临水镇把“文明摊位”摆进群众心坎里
+创意海报丨这个端午假期，琼味好物话文明
+青海湟中区举办“我们的节日·端午”主题活动
+母任劳任怨撑家28年，继子结婚卖房撵继母，麦姐仗义怒怼讨公道
+亲掏空家底凑100w给他娶媳妇，白眼狼儿子却把她赶地下室住！
+姐姐照顾父亲20年，如今得知老人有22万存款后，妹妹却闹
+女子诉苦被大姑逼离婚，细说借钱挥霍经过，杨律怒斥谁娶你谁倒霉
+婆借钱凑18万彩礼，婚后丈夫逼我还债，钱被亲妈挥霍遭崔哥怒斥
+女儿被女婿打得满身瘀青，我一通电话后，让他付出终身后悔的代价
+小叔子彩礼钱不够，婆婆让儿媳卖婚前的房子，儿媳忍无可忍这样说。mp4
+小姑子赖娘家无事生非，挑拨哥嫂闹离婚图谋房产，李律怒怼太解气
+抛妻弃子50年，老了一身病求儿子赡养，儿子：你不配做父亲
+妻子突然起诉丈夫离婚，2个儿子都不要，一张报告揭开她丑陋面目
+月子里婆婆只给吃剩菜剩饭，多年后婆婆想见孙子，儿媳：想见没
+啃老族挥霍父母拆迁款，理直气壮玩遍天下，父母苦不堪言！
+原配在街上怒打小三，小三却表示很冤枉 - 我才上受害者！
+"@type": "NewsArticle",
+"mainEntityOfPage": {
+"@type": "WebPage",
+"headline": "我也想生在好人家",
+"@type": "ImageObject",
+"width": 720,
+"height": 540
+"datePublished": "2017-05-26T18:13:48+08:00",
+"dateModified": "2017-05-26T18:13:48+08:00",
+"author": {
+"@type": "Organization",
+"publisher": {
+"@type": "Organization",
+"@type": "ImageObject",
+"width": 260,
+"height": 60
+"description": "邻居奶奶说，男孩子一眨眼就长大了。我要在这里长大，不会去当坏人，我不怪他们不和我讲话，因为我不想家里有三个坏人。"

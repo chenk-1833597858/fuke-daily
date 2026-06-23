@@ -1,0 +1,215 @@
+if (needJumpTo) {
+{ test: /sm\.cn$/i, domain: "sm" },
+{ test: /google/i, domain: "google" },
+{ test: /bing/i, domain: "bing" },
+{ test: /weibo/i, domain: "weibo" },
+{ test: /toutiao/i, domain: "toutiao" },
+if (referrer) {
+/^([hH][tT]{2}[pP]:\/\/|[hH][tT]{2}[pP][sS]:\/\/)([^\/]+).*?/;
+referDomain = urlMatch && urlMatch[2] ? urlMatch[2] : referDomain;
+if (referDomain) {
+currentPageRefer = referDomain;
+if (item.test.test(referDomain)) {
+currentPageRefer = item.domain;
+return true;
+return false;
+if (!currentPageRefer && referrer) {
+currentPageRefer = 'other'
+if (search) {
+if (searchParams.length > 0) {
+if (block === 'true') {
+spss = spss || 'wap_refluxdl_2018';
+// 防止带referFrom参数地址有其他refer来源访问
+newReferFrom = referFrom
+return newReferFrom;
+search = search.substr(1);
+if (typeof name === 'undefined') return search;
+if (isPaid && isPc) {
+storage.setItem(testKey, 'testValue');
+} catch (error) {
+console.log("localStorage.setItem不可以执行");
+return false;
+if (storage.getItem(testKey) != 'testValue') {
+return false
+storage.removeItem(testKey);
+return true;
+} catch (error) {
+console.log("localStorage.getItem不可以执行");
+return false;
+if (!isSupport()) {
+// adjust body font size
+if (document.body) {
+document.body.style.fontSize = (12 * dpr) + 'px'
+document.addEventListener('DOMContentLoaded', setBodyFontSize)
+setBodyFontSize();
+// set 1rem = viewWidth / 10
+docEl.style.fontSize = rem + 'px'
+setRemUnit()
+// reset rem unit on page resize
+if (e.persisted) {
+setRemUnit()
+// detect 0.5px supports
+if (dpr >= 2) {
+testElement.style.border = '.5px solid transparent'
+fakeBody.appendChild(testElement)
+docEl.appendChild(fakeBody)
+if (testElement.offsetHeight === 1) {
+docEl.classList.add('hairlines')
+docEl.removeChild(fakeBody)
+}(window, document))
+document.body.classList.add('toutiao');
+document.body.classList.add('baidu');
+document.body.classList.add('newsapp');
+document.body.classList.add('miniprogram');
+document.body.classList.add('pc');
+document.body.classList.add('ios');
+} catch (error) {
+console.warn(error);
+if (document.body) {
+setBodyPlatform()
+document.addEventListener('DOMContentLoaded', setBodyPlatform)
+el.id = "ttzz";
+s.parentNode.insertBefore(el, s);
+hm.async = true;
+s.parentNode.insertBefore(hm, s);
+s.async = true;
+__load_ant(true)
+p.parentNode.insertBefore(s, p);
+__load_ant(false)
+'}],aboveRecommendList:[],recommendList:[{adid:"codeAD-rs1mp492we",style:"codeAD",htmlResource:'
+',style:"codeAD"},toutiao_ssp_6407376={adid:"codeAD-yc0njvenpp",position:1,htmlResource:'
+',style:"codeAD"},badiu_ssp_295={adid:"codeAD-295",position:1,htmlResource:'
+',style:"codeAD"},toutiao_ssp_294={adid:"codeAD-294",position:1,htmlResource:'
+',style:"codeAD"},wechat_codeAD_238={adid:"codeAD-238",position:1,htmlResource:'
+',style:"codeAD"},uc_codeAD_250={adid:"codeAD-250",position:1,htmlResource:'
+',style:"codeAD"},other_codeAD_244={adid:"codeAD-244",position:1,htmlResource:'
+',style:"codeAD"},codeADCtConfig={TBS:{article:{aboveTieList:[{adid:"codeAD-tbs",position:1,htmlResource:'
+',style:"codeAD"}]}},baidu:{video:{pause:[{adid:"codeAD-257",style:"codeAD",htmlResource:'
+'}],recommendList:[{adid:"codeAD-304",position:4,htmlResource:'
+',style:"codeAD"}],aboveRecommendList:[{adid:"codeAD-0716-266",style:"codeAD",htmlResource:'
+'}]},article:{topBanner:[{adid:"codeAD-260",style:"codeAD",htmlResource:'
+'}],content:[{adid:"codeAD-0716-263",style:"codeAD",htmlResource:'
+'}],hotNewsList:[{adid:"codeAD-222",position:4,htmlResource:'
+',style:"codeAD"},{adid:"codeAD-223",position:9,htmlResource:'
+',style:"codeAD"},{adid:"codeAD-224",position:13,htmlResource:'
+',style:"codeAD"},{adid:"codeAD-225",position:17,htmlResource:'
+',style:"codeAD"}],relateNewsList:[{adid:"codeAD-221",position:4,htmlResource:'
+',style:"codeAD"}],aboveTieList:[badiu_ssp_6431680]},cambrian_article:{},home:{float:[{adid:"codeAD-302",style:"codeAD",htmlResource:'
+'}]}},toutiao:{article:{topBanner:[{adid:"codeAD-261",style:"codeAD",htmlResource:'
+'}],content:[{adid:"codeAD-0716-264",style:"codeAD",htmlResource:'
+'}],contentBom:[],aboveTieList:[toutiao_ssp_6407376]},cambrian_article:{},video:{recommendList:[],aboveRecommendList:[{adid:"codeAD-0716-267",style:"codeAD",htmlResource:'
+'}]}},wechat:{article:{aboveTieList:[wechat_codeAD_238]},video:{recommendList:[]}},uc:{article:{aboveTieList:[uc_codeAD_250]},video:{recommendList:[]}},other:{article:{aboveTieList:[other_codeAD_244],topBanner:[{adid:"codeAD-299",style:"codeAD",htmlResource:'
+'}],content:[{adid:"codeAD-0716-262",style:"codeAD",htmlResource:'
+'}]},video:{recommendList:[],aboveRecommendList:[{adid:"codeAD-0716-265",style:"codeAD",htmlResource:'
+三次诉讼离婚，她什么都不怕了
+2017-04-23 16:14
+我不想再代理这个案件了。
+驱车去见当事人满玉时，风不像春风，雨不像春雨，雨刮器一路不停，我的手机也不断响起。我知道电话那头就是满玉。我是她的律师，某种意义上，成了她唯一的救命稻草。
+我却实在有点不堪其扰了。
+这几天，她反复发给我一些因家暴而受伤的照片，还有一些不大清晰的录音，很琐碎的对话截图。只要她想起自认为有用的材料就会马上传给我，哪怕在凌晨三四点。而一旦来电话，就会颠三倒四地问：“小孩的抚养权到底会不会归她？”“能不能抓她老公坐牢？”
+找这些所谓的证据，她已轻车熟路。“一定要离了，这次一定要离了。”她说。
+但这已经是她第三次找我了。
+我与满玉的姐姐是高中同学，大学期间的一个暑假，我们一起在深圳打暑假工，二十出头的年纪，年轻而羞涩。当年很多人追求满玉，一个个托我带话，看起来都很憨厚。满玉却说，“还是和朋友一起才有安全感。”
+我说她，“给你挑个好人家，你奖励我一碗面。”
+到了夏天结束时，满玉做了一桌子菜喊大家过去，然后特意将面端到我面前，“提前给你煮了，回去好好学习，工厂的声音哪有学校悦耳。”
+没想到，再次相遇已是五年后。在镇上，满玉大着肚子一个人在走，一眼认出了我，说她要结婚了，请我去。不巧那天我有事不能到场。她挥挥手表示不在意，扶着肚子走了。我想起了那碗面，以为她找到了好人家。
+2016年8月，她找到我，却是告诉我她想离婚了。
+原来，满玉打工回家后三个月，家人给她安排了无数次相亲，最后的一次，面前的男人说自己是大学生，家境优渥，他在县城做生意，娶老婆至少安排了十来万。于满玉而言，这都不是最重要的，但三个月的时间，她早就看累了，觉得这次不管怎样都嫁。
+在当地，娶老婆必须要“认根本”，就是男方给女方家的亲戚每户包一千块钱左右的红包，他们才当新郎是自家人，再回礼参加婚宴。
+结婚之前，男人却变了卦，彩礼总共才拿来两万块，其中一万五是“认根本”的。满玉的父母认为这是奇耻大辱，当时就说女儿不嫁了。
+可当时满玉已经怀了孕，便从中周旋。男人极不情愿地加了两万块钱后破口大骂，“一窝叫花子”，“你个二手货”，“你家就这么缺钱要卖女儿了？”
+“他说‘二手货’，是我之前确实谈过一个，算理亏，所以想忍让着过。”满玉向我解释。
+满玉的婆婆是一个蛮不讲理的人。在儿子对儿媳拳打脚踢时，她在一旁帮腔，“你是我们花钱买来的，要识趣，少惹他，才能免受皮肉之苦，帮我们家带好小孩才是你的出路。”
+满玉自觉委屈，“他在外面赌钱，输了十几万，我没有多说一句，他反而骂我‘背时鬼’，晦气，影响他的时运和手气。”婆婆插着腰说，“哪怕输得倾家荡产，有的你吃就行！”
+在摩托车上，他依旧余怒未消，咬牙切齿道，“恨不得将你们娘俩推下去摔个一了百了就安逸了！”
+满玉的娘家人也出过面。但丈母娘才问一句，“你为什么老是打我女儿？”他就暴跳如雷一跃而起，将指间正燃着的烟头丢了过去，“你这个老癫婆生的好女儿，能再塞回你肚子里去吗？你还有脸来上门？”说罢又抄起一把椅子砸了过去。
+满玉的妈妈与其争执了一番后，没辙，将气撒向满玉，“当年不听我们劝，只依自己脾气行事。碰到如此蛮不讲理的人，让我们怎么给你讨公道？当初是你强出头，我们哪里看的上这反复无常的小人？你要伸长了脖子挨宰，那就看看这鸡飞狗跳的日子，死了心最好。”
+满玉联系我时，语气有些哆嗦，好似惊魂未定，说她只有孤零零一个人了 ，孩子是她的命，不得已要麻烦我。我让她不要怕，“会尽力帮你的，这样的男人吃喝嫖赌，劣迹斑斑，你能及时醒悟还来得及。”
+男人不肯协议离婚，尽管满玉唯一的要求是带走孩子。他说，“若是女娃的话无所谓，男娃要传宗接代的，别痴人说梦了！”
+我跟满玉讲，“起诉离婚如果男方没有多大过错的话，第一次一般不会判离的，你要做好思想准备，多搜集证据。他再暴力殴打你的话，一定要报警。”
+我特意加了一句话让她宽心。“小孩两周岁之前属于哺乳期，基本上会判给你的。”
+这期间，她又挨了几次打，一次是借了三千块钱给同学，被一巴掌扇到地上，男人说，“你那同学不是很牛吗？居然向一个女人借钱，我瞧不起这样的男人！”
+那次，满玉出去躲了三天，那一巴掌打得她耳膜都穿了。我问：“为什么不报警？”
+“他姐来求情了，说把警察招来多难堪？哪有家丑外扬的？闹个什么幺蛾子出来，以后对小孩当兵考公务员都有影响。”
+还有一次是满玉带孩子回娘家住了几天，那边喊了一些混混过来抢人发生了冲突。我问她，“你拍下来了没有？”她说，“没有，哪能顾及那么多？大家都催我回去。到家了，他倒大方，马上给了我一千块钱。”
+我猜她大概是不想离了。果然，当天午夜便接到了她发来的一条消息：“什么证据都没有，很难离掉吧？”我并未顺势给她台阶下，只说让她试试看。她第二天才回复我，“还没想好，要不先别起诉？”
+只过了半个月，满玉就又来找我了。这是第二次。我看到来电显示里有她十几个未接电话，暗道不好，想她恐怕是又挨打了。
+果然，“你应该知道我为什么又来找你了，也是鬼上身了。”她一上来就说。
+我毫不客气地告诉她我的不满，让她尊重一下我，不可能把所有时间都浪费在他们分分合合的拉锯战里。
+她发誓，“这次是深思熟虑了，一定要离！都被他打得在鬼门关走了一遭，现在带着孩子买了南下的车票。”
+见她如此果决，我不好再计较，叹气道：“分居了最好，我帮你汇总证据，马上递起诉状。”
+男人与满玉的相处模式基本上是打了再哄，哄了又打，这次的拉锯也只持续了一个月。我又一次把准备好的材料撕了。
+满玉让我撤诉，说男人这次彻底悔改了，写了保证书，按了手印，要来接她回家。男人给满玉买了新手机，承诺以后每月给她三千块钱生活费。最主要是，别让小孩生活在单亲家庭里。
+我想说点什么，这些年，我经手了很多婚姻家庭的案例，家暴往往发生了第一次就会有第二次。反家暴法才颁布一年，实施起来还有很多问题，人身保护令也没那么快下来，为什么有些人就是打不醒？但听她欢悦的语气，又觉得也没什么好劝的了。
+她一句谢谢也没有就挂了电话，留我望着一大堆材料发呆。
+第二天，她开始在朋友圈秀恩爱，此后半年未曾与我有过一次联络。不过我觉得这样才好，就像病人病好之后不想见到医生，没有她的消息或许才是好消息，我之前应该是多虑了。
+没想到，2017年年初，她再次找上门来。
+第三次接到她的电话，我已不想多说什么，只让她另请律师，也花不了多少钱。
+她说，“请了，却总不踏实，那律师什么都没说，只会要钱，感觉会坑人，万一小孩没争取到，连活下去的勇气也没了。”之后，她还是不断给我发语音、打电话。
+我没有改口，相较而言，我心肠比她硬。
+但后来，我还是了解到一些情况。原来那男人死性不改，变本加厉，打得更凶了。
+一次，小孩要看动画片，满玉不太会弄网络电视，多折腾了一会，男人便像吃了火药一样吼道，“你怎么不去死？电视都不会放，要你何用？”满玉答道，“那你来放吧。”他便将满玉一脚踢倒在地，并猛踩其头部、腹部及臀部，像翻一条咸鱼一样。孩子吓得在一旁大哭不止。
+地上的满玉缩成了一团，血肉模糊，她终于想起要用最后一丝力气报警、喊救护车。救护车虽来了，乡镇派出所的民警却讲，这是夫妻之间的纠纷，他们不便出面。
+满玉的婆婆还四处替儿子开脱， “这么一点小事警察都不管的，还要叫救护车，忒娇气了，存了心要丢人现眼，还没死就要喊白车。劝架时我的手也受伤了，怎么没有打120？她跟医院关系那么好？挖空心思要把钱往里送！”
+事实上，尽管满玉的婆婆跟着去了医院，却推说没带一分钱，事不关己地等满玉的父亲来才交了医药费。满玉父亲对我说，“担架上的毕竟是自己的骨肉，别人可以不把她当人看，我到底心疼。”
+满玉躺医院的那些天，男人几次打电话过来威胁她，说他早就不想要她了，准备“上诉”去。儿子一定要归他，彩礼需全部返还，明天就发“离婚诉讼”，有她好看的。
+满玉还真是孑然一身了。她姐姐告诉我，“满玉不大会做人，不听劝，把家里的人都得罪光了，让她放弃小孩早离早好，非但不听，还呛我们。”
+我终于于心不忍，给满玉回了一个电话，我承认我心软了。她的人生被打散了，但小孩一直是她带着的，我连续几天没睡一个好觉，一闭上眼睛，要么是儿子哭着找妈妈的画面，要么就是男人还在一脚一脚地踩她。
+回想起儿时自己常在家里哭，母亲却熟视无睹。我不想自己的童年在另一个孩子身上重演。
+我们不停地和派出所交涉，好不容易才立了案。带满玉去做伤情鉴定时，她才想起胸口剧痛，只是这几天太难过了，没感觉到。司法鉴定员建议做一个彩超，费用六百，不包含在鉴定费里。
+满玉认为太贵了，犹豫不决。我提醒她，这个费用到时候可以让被告出的。她才急匆匆地去开单子。片子的结果让我始料未及：一根肋骨骨折，两根未完全性骨折。鉴定结果为轻伤二级，已构成刑事案件。
+我很严肃地跟满玉讲，“这次立案就不要撤了。”她有些惊惶，“他在外面和人打架都是拿刀砍的，又有很多乱七八糟的关系。”
+去公安机关调了一下他的犯罪记录，确有好几次因打架斗殴被刑拘。最刺眼的是，“某某在XX宾馆XX号房间内盗窃X女士钱包一个，内有现金1500元……”满玉不停地抓自己头发不肯相信，“是不是弄错了？他怎么可以为了1500块钱向一个女人行窃？”
+“孩子必须我带着，跟了这样道貌岸然、没人品、没底线的爹能有什么出息？认贼作父啊！”满玉自言自语，“嫁给他三年，不知道他做过贼，竟冒充大学生，他所说的生意原来是这样的勾当……”
+满玉家人给我打来电话，依旧让我劝其快刀斩乱麻，把孩子丢给那家人算了。一抬头，就见满玉双眼血丝纵横、满是乞求地望着我。我告诉她家人，“鉴于委托关系，维护她的相关权益是职责所在。”
+最后她问我，“兴许他在外头还欠了不少债务。也担心万一孩子判给我后，他会天天来娘家打砸，抢小孩，伺机作乱。”
+“夫妻共同债务问题有了新法，你不用多虑了，要不要再考虑一下放弃小孩？”她摇头，“绝不！那我一路走来没有任何意义了。”
+那男人丝毫没有意识到自己的危害，还发信息吓唬她，“只要有钱，什么样的女人没有？”他的几位姐姐则轮番唱红脸，说她们的弟弟虽然脾气暴躁，却“爱憎分明”，让她为了孩子暂时忍一忍，“女人嘛，不就是为了孩子，为了男人好。”
+满玉一脸不屑控诉道，“他打我时，没见他们家哪一个人肯为我说一句话，替他求情就都跳了出来！他该坐牢就坐牢，该赔偿就赔偿，一切按法定程序来办。”
+时至今日，她是怕了，又什么都不怕了。
+这起离婚案原计划于4月25开庭审理，因为故意伤人已构成了刑事案件。满玉的丈夫畏罪潜逃，开庭将面临被延迟。而满玉的婚姻，不知何时才能结束。
+经过当事人同意，我写下了这个故事。
+题图：李晶；插图：《被嫌弃的松子的一生》剧照
+责任编辑：简晓君_简晓君
+奥迪悬挂套牌“润A88888” 交警回应
+专家解读“时隔44年试射洲际导弹”
+开场65秒破门 巴拉圭1-0土耳其
+从“苏超”到“东北超”
+世界杯首例捂嘴红牌出现
+三农快评 “十五五”期间 六大行动促农民工就业
+烟火气里送服务！临水镇把“文明摊位”摆进群众心坎里
+创意海报丨这个端午假期，琼味好物话文明
+演员张颂文深夜街头救人，获评“见义勇为先进个人”；此前本人回应：该帮就帮，该扶就扶，有什么可怕的呢？
+青海湟中区举办“我们的节日·端午”主题活动
+丈夫逼走我妈扬言离婚，又让小姑借住，我一句话后直接出手
+男人家暴还带走孩子要离婚？梦龙老师一语戳破女人的谎言！太离谱
+女子诉苦被大姑逼离婚，细说借钱挥霍经过，杨律怒斥谁娶你谁倒霉
+孤女拿到亡父32万赔偿款，亲戚们为争抢抚养权，在法院大打出手 2
+富豪婆婆每月给儿媳2万，竟反咬对方看不起她，超哥怒怼太解气
+父亲离世母亲改嫁，卷走存款抛下女儿，十五岁少女无家可归！
+怀孕妻子被丈夫殴打住院，当娘家人上门找女婿算账那一刻，泪目了
+父亲为了不花钱娶到媳妇儿，竟把亲生儿子和继女撮合一起，直到15年后出了问题3
+帮弟贷40万拖垮小家，丈夫拒绝买单，米律点醒：伏弟魔该醒醒了
+女子婚内挥霍800万包养7人，网友：比电视剧还敢演
+妻子突然起诉丈夫离婚，2个儿子都不要，一张报告揭开她丑陋面目
+啃老族挥霍父母拆迁款，理直气壮玩遍天下，父母苦不堪言！
+男子街头摁住前妻暴打，抡起板凳疯狂猛砸，场面血腥令人咋舌
+后坚持丁克，还嫌弃跟婆婆住一起，结果被老公愤怒的赶出家门
+公婆给4套房3辆车仍被儿媳刁难11年丈夫要离婚她跪求原谅
+"@type": "NewsArticle",
+"mainEntityOfPage": {
+"@type": "WebPage",
+"headline": "三次诉讼离婚，她什么都不怕了",
+"@type": "ImageObject",
+"width": 720,
+"height": 540
+"datePublished": "2017-04-23T16:14:15+08:00",
+"dateModified": "2017-04-23T16:14:15+08:00",
+"author": {
+"@type": "Organization",
+"publisher": {
+"@type": "Organization",
+"@type": "ImageObject",
+"width": 260,
+"height": 60
+"description": "地上的满玉缩成了一团，血肉模糊，她终于想起要用最后一丝力气报警、喊救护车。救护车虽来了，乡镇派出所的民警却讲，这是夫妻之间的纠纷，他们不便出面。"
