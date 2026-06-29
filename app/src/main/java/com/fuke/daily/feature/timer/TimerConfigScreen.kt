@@ -1,4 +1,4 @@
-package com.fuke.daily.ui.timer
+package com.fuke.daily.feature.timer
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -52,7 +52,7 @@ import com.fuke.daily.data.model.*
 import com.fuke.daily.ui.components.CompactInputField
 import com.fuke.daily.ui.components.PageHeader
 import com.fuke.daily.ui.theme.FukeTheme
-import com.fuke.daily.viewmodel.TimerViewModel
+import com.fuke.daily.feature.timer.TimerViewModel
 
 // ═══════════════════════════════════════════════════
 //  定时任务配置页 — 严格按网页原型 task-app-warm.html

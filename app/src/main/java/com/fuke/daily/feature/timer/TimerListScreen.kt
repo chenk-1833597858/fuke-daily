@@ -1,4 +1,4 @@
-package com.fuke.daily.ui.timer
+package com.fuke.daily.feature.timer
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
@@ -60,7 +60,7 @@ import com.fuke.daily.data.model.RepeatMode
 import com.fuke.daily.data.model.ReminderSubType
 import com.fuke.daily.data.model.dayOfWeekLabels
 import com.fuke.daily.ui.theme.FukeTheme
-import com.fuke.daily.viewmodel.TimerViewModel
+import com.fuke.daily.feature.timer.TimerViewModel
 
 // ═══════════════════════════════════════════════════
 //  定时任务列表页

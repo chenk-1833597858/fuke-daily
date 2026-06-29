@@ -11,7 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.fuke.daily.service.FloatingWindowService
+import com.fuke.daily.feature.floating.FloatingWindowService
 import com.fuke.daily.ui.home.HomeScreen
 import com.fuke.daily.ui.mainline.MainlineDailyScreen
 import com.fuke.daily.ui.mainline.MainlineDetailScreen
@@ -23,8 +23,8 @@ import com.fuke.daily.ui.quiz.QuizConfigScreen
 import com.fuke.daily.ui.random.RandomConfigScreen
 import com.fuke.daily.ui.random.RichTextPage
 import com.fuke.daily.ui.selection.SelectionConfigScreen
-import com.fuke.daily.ui.timer.TimerConfigScreen
-import com.fuke.daily.ui.timer.TimerListScreen
+import com.fuke.daily.feature.timer.TimerConfigScreen
+import com.fuke.daily.feature.timer.TimerListScreen
 
 // ═══════════════════════════════════════════════════
 //  路由定义

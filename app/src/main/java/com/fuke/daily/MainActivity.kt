@@ -14,7 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fuke.daily.data.datastore.AppPrefs
-import com.fuke.daily.service.FloatingWindowService
+import com.fuke.daily.feature.floating.FloatingWindowService
 import com.fuke.daily.ui.navigation.AppNavigation
 import com.fuke.daily.ui.theme.FukeDailyTheme
 import com.fuke.daily.ui.theme.ThemeMode

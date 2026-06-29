@@ -6,8 +6,8 @@ import android.content.Intent
 import android.os.Build
 import com.fuke.daily.data.model.ReminderMethods
 import com.fuke.daily.data.model.ReminderSubType
-import com.fuke.daily.service.FloatingWindowService
-import com.fuke.daily.service.TimerReminderService
+import com.fuke.daily.feature.floating.FloatingWindowService
+import com.fuke.daily.feature.timer.TimerReminderService
 import com.fuke.daily.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

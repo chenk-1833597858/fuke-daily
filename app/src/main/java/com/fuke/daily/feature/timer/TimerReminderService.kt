@@ -1,4 +1,4 @@
-package com.fuke.daily.service
+package com.fuke.daily.feature.timer
 
 import android.app.AlarmManager
 import android.app.Notification
@@ -17,6 +17,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.core.app.NotificationCompat
 import com.fuke.daily.MainActivity
+import com.fuke.daily.feature.floating.FloatingWindowService
 import com.fuke.daily.R
 import com.fuke.daily.data.model.ReminderMethods
 import com.fuke.daily.data.model.ReminderSubType

@@ -1,4 +1,4 @@
-package com.fuke.daily.viewmodel
+package com.fuke.daily.feature.timer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -6,7 +6,7 @@ import android.content.Context
 import com.fuke.daily.data.model.*
 import com.fuke.daily.data.repository.MainListRepo
 import com.fuke.daily.data.repository.TimerRepo
-import com.fuke.daily.service.TimerReminderService
+import com.fuke.daily.feature.timer.TimerReminderService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch

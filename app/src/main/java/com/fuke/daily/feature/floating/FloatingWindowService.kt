@@ -1,4 +1,4 @@
-package com.fuke.daily.service
+package com.fuke.daily.feature.floating
 
 import android.app.Notification
 import android.app.NotificationChannel
