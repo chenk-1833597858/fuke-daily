@@ -53,6 +53,7 @@ class TimerReminderService : Service() {
     private lateinit var vibrator: Vibrator
     private var ringtone: Ringtone? = null
     private var periodicCheckJob: kotlinx.coroutines.Job? = null
+    private var stopAlarmReceiver: android.content.BroadcastReceiver? = null
 
     // 通过Hilt EntryPoint获取TimerRepo
     private val timerRepo: TimerRepo by lazy {
@@ -64,17 +65,35 @@ class TimerReminderService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        AppLogger.i("Timer: TimerReminderService onCreate")
         alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
         startForeground(NOTIFICATION_ID, createNotification())
-        AppLogger.d("Timer: 前台服务已启动")
+        AppLogger.i("Timer: 前台服务已启动")
 
         // 恢复所有已启用任务
         serviceScope.launch {
             delay(300)
             restoreEnabledTasks()
         }
+        
+        // 注册停止闹钟广播接收器
+        stopAlarmReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == "com.fuke.daily.STOP_ALARM_SOUND") {
+                    AppLogger.i("Timer: 收到停止闹钟广播")
+                    stopEffectOnly()
+                }
+            }
+        }
+        val filter = android.content.IntentFilter("com.fuke.daily.STOP_ALARM_SOUND")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(stopAlarmReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(stopAlarmReceiver, filter)
+        }
+        AppLogger.i("Timer: 停止闹钟广播接收器已注册")
 
         // 定期检查（每10分钟）
         startPeriodicCheck()
@@ -121,6 +140,15 @@ class TimerReminderService : Service() {
         stopReminder()
         periodicCheckJob?.cancel()
         serviceScope.cancel()
+        
+        // 注销广播接收器
+        try {
+            stopAlarmReceiver?.let { unregisterReceiver(it) }
+            AppLogger.i("Timer: 停止闹钟广播接收器已注销")
+        } catch (e: Exception) {
+            AppLogger.w("Timer: 注销广播接收器失败: ${e.message}")
+        }
+        
         AppLogger.d("Timer: 前台服务已停止")
     }
 
@@ -280,26 +308,35 @@ class TimerReminderService : Service() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
-                    )
+                    // 使用 AlarmClock 最可靠，会在状态栏显示闹钟图标
+                    val alarmInfo = AlarmManager.AlarmClockInfo(triggerTime, pendingIntent)
+                    alarmManager.setAlarmClock(alarmInfo, pendingIntent)
+                    AppLogger.i("Timer: 使用 AlarmClock 设置闹钟: ${formatTime(triggerTime)}")
                 } else {
                     alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                     )
+                    AppLogger.i("Timer: 使用 setAndAllowWhileIdle 设置闹钟: ${formatTime(triggerTime)}")
                 }
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                 )
+                AppLogger.i("Timer: 使用 setExactAndAllowWhileIdle 设置闹钟: ${formatTime(triggerTime)}")
             } else {
                 alarmManager.setExact(
                     AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent
                 )
+                AppLogger.i("Timer: 使用 setExact 设置闹钟: ${formatTime(triggerTime)}")
             }
         } catch (e: Exception) {
             AppLogger.e("Timer: 设置闹钟失败: ${e.message}")
         }
+    }
+
+    private fun formatTime(timeMs: Long): String {
+        val sdf = java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.getDefault())
+        return sdf.format(java.util.Date(timeMs))
     }
 
     private fun cancelTask(taskId: Long) {
@@ -319,7 +356,8 @@ class TimerReminderService : Service() {
     private fun triggerReminder(taskId: Long, methodsMask: Int) {
         val methods = ReminderMethods.fromBitmask(methodsMask)
 
-        AppLogger.d("Timer: 触发提醒: taskId=$taskId, alarm=${methods.alarm}, vib=${methods.vibration}, float=${methods.floatingWindow}")
+        AppLogger.i("Timer: triggerReminder taskId=$taskId, methodsMask=$methodsMask")
+        AppLogger.i("Timer: alarm=${methods.alarm}, vib=${methods.vibration}, float=${methods.floatingWindow}")
 
         if (methods.alarm) playAlarm()
         if (methods.vibration) vibrate()
@@ -341,9 +379,17 @@ class TimerReminderService : Service() {
                 AppLogger.d("Timer: 次数更新: $newCount/${task.count}")
             }
 
-            // 启动悬浮窗
+            // 启动悬浮窗闪烁
             if (methods.floatingWindow) {
-                FloatingWindowService.start(this@TimerReminderService)
+                AppLogger.i("Timer: 准备启动悬浮窗闪烁")
+                try {
+                    FloatingWindowService.startFlashing(this@TimerReminderService)
+                    AppLogger.i("Timer: 悬浮窗闪烁启动成功")
+                } catch (e: Exception) {
+                    AppLogger.e("Timer: 悬浮窗闪烁启动失败: ${e.message}")
+                }
+            } else {
+                AppLogger.i("Timer: 未勾选悬浮窗提醒，跳过")
             }
         }
 
@@ -387,7 +433,8 @@ class TimerReminderService : Service() {
         ringtone?.stop()
         ringtone = null
         if (vibrator.hasVibrator()) vibrator.cancel()
-        FloatingWindowService.stop(this)
+        // 只停止铃声和震动，不停止 FloatingWindowService
+        // 悬浮窗的闪烁由 FloatingWindowService 自己控制
         AppLogger.d("Timer: 提醒特效已停止（任务继续调度）")
     }
 

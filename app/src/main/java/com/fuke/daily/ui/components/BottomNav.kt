@@ -66,7 +66,7 @@ fun BottomNav(
             )
             BottomNavItem(
                 icon = Icons.Filled.PlayArrow,
-                label = "人生主线",
+                label = "日志",
                 selected = selectedIndex == 2,
                 onSelect = { onTabSelect(2) },
             )

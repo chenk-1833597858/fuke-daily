@@ -56,6 +56,8 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
+import com.fuke.daily.data.model.ColoredContent
+import com.fuke.daily.data.model.ColoredTextSegment
 import com.fuke.daily.data.model.ListType
 import com.fuke.daily.data.model.OptionButton
 import com.fuke.daily.data.model.QuizCard
@@ -74,7 +76,7 @@ import com.fuke.daily.ui.theme.FukeTheme
 @Composable
 fun FloatingPopup(
     modifier: Modifier = Modifier,
-    content: String = "",
+    content: ColoredContent = emptyList(),
     buttons: List<OptionButton> = emptyList(),
     activeButtons: Int = 0,
     isVisible: Boolean = true,
@@ -143,7 +145,7 @@ fun FloatingPopup(
 
 @Composable
 private fun BottomSheetContent(
-    content: String,
+    content: ColoredContent,
     buttons: List<OptionButton>,
     activeButtons: Int,
     imageUri: String?,
@@ -267,17 +269,13 @@ private fun ImagePlaceholder(
 
 @Composable
 private fun ContentBox(
-    content: String,
+    content: ColoredContent,
     activeButtons: Int,
     onButtonClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val extended = FukeTheme.extended
     val scrollState = rememberScrollState()
-
-    val contentParts = remember(content) {
-        parseContentWithButtons(content)
-    }
 
     Box(
         modifier = modifier
@@ -291,7 +289,7 @@ private fun ContentBox(
             modifier = Modifier.verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            contentParts.forEachIndexed { lineIndex, lineParts ->
+            content.forEachIndexed { lineIndex, line ->
                 if (lineIndex > 0) {
                     Spacer(modifier = Modifier.height(6.dp))
                 }
@@ -301,41 +299,13 @@ private fun ContentBox(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                 ) {
-                    lineParts.forEach { part ->
-                        when (part) {
-                            is ContentPart.Button -> {
-                                val mask = when (part.buttonIndex) {
-                                    0 -> 1; 1 -> 2; 2 -> 4; else -> 0
-                                }
-                                val isHighlighted = (activeButtons and mask) != 0
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(
-                                            if (isHighlighted) extended.primary
-                                            else extended.contentBg.copy(alpha = 0.6f),
-                                        )
-                                        .clickable { onButtonClick(part.buttonIndex) }
-                                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = part.text,
-                                        fontSize = 14.sp,
-                                        color = if (isHighlighted) Color.White else extended.text,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(6.dp))
-                            }
-                            is ContentPart.Text -> {
-                                Text(
-                                    text = part.text,
-                                    fontSize = 18.sp,
-                                    color = extended.text,
-                                )
-                            }
-                        }
+                    line.segments.forEach { segment ->
+                        val textColor = if (segment.color != Color.Unspecified) segment.color else extended.text
+                        Text(
+                            text = segment.text,
+                            fontSize = 18.sp,
+                            color = textColor,
+                        )
                     }
                 }
             }

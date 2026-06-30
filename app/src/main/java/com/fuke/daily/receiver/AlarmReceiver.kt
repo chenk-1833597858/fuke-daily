@@ -29,7 +29,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val taskId = intent.getLongExtra(EXTRA_TASK_ID, 0)
         val reminderMethods = intent.getIntExtra(EXTRA_REMINDER_METHODS, 0)
 
-        AppLogger.d("AlarmReceiver: 闹钟触发: taskId=$taskId, methods=$reminderMethods")
+        AppLogger.i("AlarmReceiver: 闹钟触发: taskId=$taskId, methods=$reminderMethods")
 
         if (taskId == 0L) {
             AppLogger.w("AlarmReceiver: taskId为0，跳过")

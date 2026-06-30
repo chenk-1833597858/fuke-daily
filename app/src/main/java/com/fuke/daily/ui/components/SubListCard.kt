@@ -230,6 +230,10 @@ fun SubListCard(
 
             // ── 内容编辑器 ──
             if (contentConfig != null) {
+                // 颜色选择弹窗状态
+                var showColorPicker by rememberSaveable { mutableStateOf(false) }
+                var colorPickerLineIndex by rememberSaveable { mutableStateOf(0) }
+                
                 ContentEditor(
                     input1Text = contentConfig.input1Text,
                     input2Text = contentConfig.input2Text,
@@ -237,14 +241,57 @@ fun SubListCard(
                     storage1 = contentConfig.button1Storage,
                     storage2 = contentConfig.button2Storage,
                     storage3 = contentConfig.button3Storage,
+                    input1TextColor = contentConfig.input1TextColor,
+                    input1RefColor = contentConfig.input1RefColor,
+                    input2TextColor = contentConfig.input2TextColor,
+                    input2RefColor = contentConfig.input2RefColor,
+                    input3TextColor = contentConfig.input3TextColor,
+                    input3RefColor = contentConfig.input3RefColor,
                     onInput1Change = { onContentConfigChange(contentConfig.copy(input1Text = it)) },
                     onInput2Change = { onContentConfigChange(contentConfig.copy(input2Text = it)) },
                     onInput3Change = { onContentConfigChange(contentConfig.copy(input3Text = it)) },
                     onRefTagClick = onRefTagClick,
+                    onColorClick = { lineIndex ->
+                        colorPickerLineIndex = lineIndex
+                        showColorPicker = true
+                    },
                     fixedSlotActive = subList.fixedSlot > 0,
                     fixedSlotName = if (subList.fixedSlot > 0) "【${cnNumbers.getOrElse(subList.fixedSlot - 1) { "${subList.fixedSlot}" }}】" else "固定槽",
                     fixedSlotColor = if (subList.fixedSlot > 0) extended.fixedSlotColors.getOrElse(subList.fixedSlot - 1) { androidx.compose.ui.graphics.Color.Gray } else null,
                 )
+                
+                // 颜色选择弹窗
+                if (showColorPicker) {
+                    val currentTextColor = when (colorPickerLineIndex) {
+                        0 -> contentConfig.input1TextColor
+                        1 -> contentConfig.input2TextColor
+                        2 -> contentConfig.input3TextColor
+                        else -> ""
+                    }
+                    val currentRefColor = when (colorPickerLineIndex) {
+                        0 -> contentConfig.input1RefColor
+                        1 -> contentConfig.input2RefColor
+                        2 -> contentConfig.input3RefColor
+                        else -> ""
+                    }
+                    
+                    ColorPickerDialog(
+                        lineIndex = colorPickerLineIndex,
+                        currentTextColor = currentTextColor,
+                        currentRefColor = currentRefColor,
+                        onDismiss = { showColorPicker = false },
+                        onConfirm = { textColor, refColor ->
+                            val updatedConfig = when (colorPickerLineIndex) {
+                                0 -> contentConfig.copy(input1TextColor = textColor, input1RefColor = refColor)
+                                1 -> contentConfig.copy(input2TextColor = textColor, input2RefColor = refColor)
+                                2 -> contentConfig.copy(input3TextColor = textColor, input3RefColor = refColor)
+                                else -> contentConfig
+                            }
+                            onContentConfigChange(updatedConfig)
+                            showColorPicker = false
+                        },
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))

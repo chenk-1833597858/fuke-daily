@@ -33,7 +33,7 @@ import javax.inject.Singleton
         LinkRecord::class,
         TimerItem::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 @TypeConverters(ListTypeConverters::class, TimerTypeConverters::class)
@@ -89,6 +89,18 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 添加颜色字段到 content_configs 表
+        db.execSQL("ALTER TABLE content_configs ADD COLUMN input1TextColor TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE content_configs ADD COLUMN input1RefColor TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE content_configs ADD COLUMN input2TextColor TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE content_configs ADD COLUMN input2RefColor TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE content_configs ADD COLUMN input3TextColor TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE content_configs ADD COLUMN input3RefColor TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 // ═══════════════════════════════════════════════════
 //  Hilt 模块 — 提供 Database 和 DAO 实例
 // ═══════════════════════════════════════════════════
@@ -105,7 +117,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "fuke-daily-db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .fallbackToDestructiveMigration()
             .build()
     }

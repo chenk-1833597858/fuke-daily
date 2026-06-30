@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.fuke.daily.feature.floating.FloatingWindowService
 import com.fuke.daily.ui.home.HomeScreen
+import com.fuke.daily.ui.log.LogScreen
 import com.fuke.daily.ui.mainline.MainlineDailyScreen
 import com.fuke.daily.ui.mainline.MainlineDetailScreen
 import com.fuke.daily.ui.mainline.MainlineEditScreen
@@ -22,6 +23,7 @@ import com.fuke.daily.ui.permission.PermissionGuideScreen
 import com.fuke.daily.ui.quiz.QuizConfigScreen
 import com.fuke.daily.ui.random.RandomConfigScreen
 import com.fuke.daily.ui.random.RichTextPage
+import com.fuke.daily.ui.settings.SettingsScreen
 import com.fuke.daily.ui.selection.SelectionConfigScreen
 import com.fuke.daily.feature.timer.TimerConfigScreen
 import com.fuke.daily.feature.timer.TimerListScreen
@@ -44,6 +46,8 @@ object Routes {
     const val TIMER_CONFIG = "timer/config/{timerId}"
     const val MEMORY_CARD = "memory/{listId}"
     const val MAINLINE_DAILY = "mainline/daily"
+    const val LOGS = "logs"
+    const val SETTINGS = "settings"
 }
 
 // ═══════════════════════════════════════════════════
@@ -88,6 +92,8 @@ fun AppNavigation(
                 onNavigateToConfig = { route -> navController.navigate(route) },
                 onNavigateToTimer = { navController.navigate(Routes.TIMER_LIST) },
                 onNavigateToMainline = { navController.navigate(Routes.MAINLINE_DAILY) },
+                onNavigateToLogs = { navController.navigate(Routes.LOGS) },
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToMainlineDetail = { listId ->
                     navController.navigate("mainline/detail/$listId")
                 },
@@ -193,6 +199,19 @@ fun AppNavigation(
             MemoryCardScreen(
                 listId = listId,
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.LOGS) {
+            LogScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToLogs = { navController.navigate(Routes.LOGS) },
             )
         }
     }

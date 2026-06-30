@@ -25,8 +25,12 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.fuke.daily.feature.timer.TimerReminderService
 import com.fuke.daily.MainActivity
 import com.fuke.daily.data.datastore.AppPrefs
+import com.fuke.daily.data.model.ColoredContent
+import com.fuke.daily.data.model.ColoredContentLine
+import com.fuke.daily.data.model.ColoredTextSegment
 import com.fuke.daily.data.model.ContentConfig
 import com.fuke.daily.data.model.ListType
 import com.fuke.daily.data.model.OptionButton
@@ -56,6 +60,10 @@ import javax.inject.Inject
 class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
     @Inject lateinit var floatingWindowManager: FloatingWindowManager
+
+    init {
+        AppLogger.i("FloatingWindowService: init block")
+    }
     @Inject lateinit var appPrefs: AppPrefs
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -85,7 +93,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
     // ── 状态 ──
     private val _isPopupVisible = MutableStateFlow(false)
-    private val _currentContent = MutableStateFlow("")
+    private val _currentContent = MutableStateFlow<ColoredContent>(emptyList())
     private val _currentButtons = MutableStateFlow<List<OptionButton>>(emptyList())
     private val _activeButtons = MutableStateFlow(0)
     private val _currentImageUri = MutableStateFlow<String?>(null)
@@ -93,6 +101,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     private val _themeMode = MutableStateFlow(ThemeMode.WARM)
     private val _currentListType = MutableStateFlow(ListType.SELECTION)
     private val _currentQuizCards = MutableStateFlow<List<QuizCard>>(emptyList())
+    private val _isIconFlashing = MutableStateFlow(false)
 
     // ── 拖动 + 双击 ──
     private var isDragging = false
@@ -134,11 +143,38 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
             }
 
             when (intent?.action) {
-                ACTION_SHOW_ICON -> showIcon()
-                ACTION_HIDE_ICON -> hideIcon()
-                ACTION_TOGGLE_POPUP -> togglePopup()
-                ACTION_NEXT_ITEM -> loadNextItem()
-                else -> showIcon()
+                ACTION_SHOW_ICON -> {
+                    AppLogger.i("FloatingWindowService: ACTION_SHOW_ICON")
+                    showIcon()
+                }
+                ACTION_HIDE_ICON -> {
+                    AppLogger.i("FloatingWindowService: ACTION_HIDE_ICON")
+                    hideIcon()
+                }
+                ACTION_TOGGLE_POPUP -> {
+                    AppLogger.i("FloatingWindowService: ACTION_TOGGLE_POPUP")
+                    togglePopup()
+                }
+                ACTION_NEXT_ITEM -> {
+                    AppLogger.i("FloatingWindowService: ACTION_NEXT_ITEM")
+                    loadNextItem()
+                }
+                ACTION_START_FLASHING -> {
+                    AppLogger.i("FloatingWindowService: ACTION_START_FLASHING, current=${_isIconFlashing.value}")
+                    _isIconFlashing.value = true
+                }
+                ACTION_STOP_FLASHING -> {
+                    AppLogger.i("FloatingWindowService: ACTION_STOP_FLASHING")
+                    _isIconFlashing.value = false
+                }
+                ACTION_STOP_ALARM -> {
+                    AppLogger.i("FloatingWindowService: ACTION_STOP_ALARM")
+                    stopAlarmSound()
+                }
+                else -> {
+                    AppLogger.i("FloatingWindowService: unknown action=${intent?.action}, showing icon")
+                    showIcon()
+                }
             }
         } catch (e: Exception) {
             AppLogger.e("FloatingWindowService: onStartCommand failed", e)
@@ -274,8 +310,10 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
                 setContent {
                     val themeMode by _themeMode.collectAsState()
+                    val isFlashing by _isIconFlashing.collectAsState()
                     FukeDailyTheme(themeMode = themeMode) {
                         com.fuke.daily.floating.FloatingIcon(
+                            isFlashing = isFlashing,
                             onDoubleTap = { onIconDoubleClick() },
                             onLongPress = {
                                 // 长按刷新
@@ -403,6 +441,19 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         }
     }
 
+    private fun stopAlarmSound() {
+        // 停止闹钟特效和铃声（不停止任务调度）
+        // 使用 TimerReminderService.stopEffectOnly() 静态方法，与原悬浮窗工具一致
+        TimerReminderService.stopEffectOnly(this)
+        
+        _isIconFlashing.value = false
+        AppLogger.i("FloatingWindowService: alarm stopped via TimerReminderService.stopEffectOnly()")
+        
+        // 双击停止闹钟后，展开悬浮弹窗显示内容（与原项目一致）
+        AppLogger.i("FloatingWindowService: 双击停止闹钟，展开悬浮弹窗")
+        showPopup()
+    }
+
     private fun hidePopup() {
         try {
             floatingWindowManager.hidePopup()
@@ -445,7 +496,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     val cards = floatingWindowManager.loadQuizCards(mainList.id)
                     _currentListType.value = ListType.QUIZ
                     _currentQuizCards.value = cards
-                    _currentContent.value = ""
+                    _currentContent.value = emptyList()
                     _currentButtons.value = emptyList()
                     _currentImageUri.value = null
                     _currentImageEnabled.value = true
@@ -486,7 +537,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                 val result = floatingWindowManager.loadFirstEnabledItem()
                 if (result == null) {
                     AppLogger.w("FloatingWindowService: no enabled items")
-                    _currentContent.value = ""
+                    _currentContent.value = emptyList()
                     _currentButtons.value = emptyList()
                     _currentQuizCards.value = emptyList()
                     return@launch
@@ -499,7 +550,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     val cards = floatingWindowManager.loadQuizCards(mainList.id)
                     _currentListType.value = ListType.QUIZ
                     _currentQuizCards.value = cards
-                    _currentContent.value = ""
+                    _currentContent.value = emptyList()
                     _currentButtons.value = emptyList()
                     _currentImageUri.value = null
                     _currentImageEnabled.value = true
@@ -533,12 +584,17 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         config: ContentConfig,
         storageData: com.fuke.daily.data.model.StorageData,
         fixedSlotData: String,
-    ): String {
-        val parts = mutableListOf<String>()
+    ): ColoredContent {
+        val lines = mutableListOf<ColoredContentLine>()
 
         // 行1: input1 + storageData[button1Storage]
-        val line1 = buildLine(config.input1Text, if (config.button1Storage > 0) storageData.getSlot(config.button1Storage) else "")
-        if (line1.isNotEmpty()) parts.add(line1)
+        val line1 = buildLine(
+            config.input1Text,
+            if (config.button1Storage > 0) storageData.getSlot(config.button1Storage) else "",
+            config.input1TextColor,
+            config.input1RefColor,
+        )
+        if (line1.segments.isNotEmpty()) lines.add(line1)
 
         // 行2: input2 + (fixedSlotData or storageData[button2Storage])
         val line2Suffix = if (subList.fixedSlot > 0 && fixedSlotData.isNotBlank()) {
@@ -546,22 +602,49 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         } else if (config.button2Storage > 0) {
             storageData.getSlot(config.button2Storage)
         } else ""
-        val line2 = buildLine(config.input2Text, line2Suffix)
-        if (line2.isNotEmpty()) parts.add(line2)
+        val line2 = buildLine(config.input2Text, line2Suffix, config.input2TextColor, config.input2RefColor)
+        if (line2.segments.isNotEmpty()) lines.add(line2)
 
         // 行3: input3 + storageData[button3Storage]
-        val line3 = buildLine(config.input3Text, if (config.button3Storage > 0) storageData.getSlot(config.button3Storage) else "")
-        if (line3.isNotEmpty()) parts.add(line3)
+        val line3 = buildLine(
+            config.input3Text,
+            if (config.button3Storage > 0) storageData.getSlot(config.button3Storage) else "",
+            config.input3TextColor,
+            config.input3RefColor,
+        )
+        if (line3.segments.isNotEmpty()) lines.add(line3)
 
-        return parts.joinToString("\n")
+        return lines
     }
 
-    private fun buildLine(prefix: String, suffix: String): String {
-        return when {
-            prefix.isBlank() && suffix.isBlank() -> ""
-            prefix.isBlank() -> suffix
-            suffix.isBlank() -> prefix
-            else -> "$prefix $suffix"
+    private fun buildLine(prefix: String, suffix: String, textColor: String, refColor: String): ColoredContentLine {
+        val segments = mutableListOf<ColoredTextSegment>()
+        val textColorParsed = parseColor(textColor)
+        val refColorParsed = parseColor(refColor)
+
+        when {
+            prefix.isBlank() && suffix.isBlank() -> {}
+            prefix.isBlank() -> {
+                segments.add(ColoredTextSegment(suffix, refColorParsed))
+            }
+            suffix.isBlank() -> {
+                segments.add(ColoredTextSegment(prefix, textColorParsed))
+            }
+            else -> {
+                segments.add(ColoredTextSegment(prefix, textColorParsed))
+                segments.add(ColoredTextSegment(suffix, refColorParsed))
+            }
+        }
+
+        return ColoredContentLine(segments)
+    }
+
+    private fun parseColor(colorString: String): androidx.compose.ui.graphics.Color {
+        return try {
+            if (colorString.isBlank()) return androidx.compose.ui.graphics.Color.Unspecified
+            androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(colorString))
+        } catch (e: Exception) {
+            androidx.compose.ui.graphics.Color.Unspecified
         }
     }
 
@@ -675,8 +758,15 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     }
 
     private fun onIconDoubleClick() {
-        AppLogger.i("FloatingWindowService: icon double-clicked, showing popup")
-        showPopup()
+        if (_isIconFlashing.value) {
+            // 如果图标在闪烁（闹钟响起），双击停止闹钟
+            AppLogger.i("FloatingWindowService: icon double-clicked while flashing, stopping alarm")
+            stopAlarmSound()
+        } else {
+            // 正常双击，显示弹窗
+            AppLogger.i("FloatingWindowService: icon double-clicked, showing popup")
+            showPopup()
+        }
     }
 
     companion object {
@@ -688,10 +778,34 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         const val ACTION_HIDE_ICON = "com.fuke.daily.HIDE_ICON"
         const val ACTION_TOGGLE_POPUP = "com.fuke.daily.TOGGLE_POPUP"
         const val ACTION_NEXT_ITEM = "com.fuke.daily.NEXT_ITEM"
+        const val ACTION_START_FLASHING = "com.fuke.daily.START_FLASHING"
+        const val ACTION_STOP_FLASHING = "com.fuke.daily.STOP_FLASHING"
+        const val ACTION_STOP_ALARM = "com.fuke.daily.STOP_ALARM"
 
         fun start(context: android.content.Context) {
             val intent = Intent(context, FloatingWindowService::class.java).apply {
                 action = ACTION_SHOW_ICON
+            }
+            context.startForegroundService(intent)
+        }
+
+        fun startFlashing(context: android.content.Context) {
+            val intent = Intent(context, FloatingWindowService::class.java).apply {
+                action = ACTION_START_FLASHING
+            }
+            context.startForegroundService(intent)
+        }
+
+        fun stopFlashing(context: android.content.Context) {
+            val intent = Intent(context, FloatingWindowService::class.java).apply {
+                action = ACTION_STOP_FLASHING
+            }
+            context.startForegroundService(intent)
+        }
+
+        fun stopAlarm(context: android.content.Context) {
+            val intent = Intent(context, FloatingWindowService::class.java).apply {
+                action = ACTION_STOP_ALARM
             }
             context.startForegroundService(intent)
         }

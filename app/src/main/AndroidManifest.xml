@@ -37,13 +37,13 @@
 
         <!-- Floating window service (for Phase 9) -->
         <service
-            android:name=".service.FloatingWindowService"
+            android:name=".feature.floating.FloatingWindowService"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
         <!-- Timer reminder service -->
         <service
-            android:name=".service.TimerReminderService"
+            android:name=".feature.timer.TimerReminderService"
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 

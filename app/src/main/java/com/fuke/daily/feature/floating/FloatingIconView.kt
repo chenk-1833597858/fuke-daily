@@ -56,6 +56,7 @@ private val ColorGreen = Color(0xFF81C784)
 fun FloatingIcon(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
+    isFlashing: Boolean = false,
     onDoubleTap: () -> Unit = {},
     onLongPress: () -> Unit = {},
     onDrag: (Offset) -> Unit = {},
@@ -84,6 +85,25 @@ fun FloatingIcon(
         animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
         label = "gradientColor",
     )
+
+    // 闪烁动画
+    var flashAlpha by remember { mutableStateOf(1f) }
+    var flashScale by remember { mutableStateOf(1f) }
+    LaunchedEffect(isFlashing) {
+        if (isFlashing) {
+            while (true) {
+                flashAlpha = 0.2f
+                flashScale = 1.2f
+                delay(200L)
+                flashAlpha = 1f
+                flashScale = 1f
+                delay(200L)
+            }
+        } else {
+            flashAlpha = 1f
+            flashScale = 1f
+        }
+    }
 
     // 拖动状态
     var totalDrag by remember { mutableStateOf(Offset.Zero) }
@@ -150,9 +170,15 @@ fun FloatingIcon(
         // 内部背景
         Box(
             modifier = Modifier
-                .size(size - 6.dp)
+                .size((size - 6.dp) * flashScale)
                 .clip(CircleShape)
-                .background(extended.primary.copy(alpha = 0.9f)),
+                .background(
+                    if (isFlashing) {
+                        Color.Red.copy(alpha = 0.9f * flashAlpha)
+                    } else {
+                        extended.primary.copy(alpha = 0.9f * flashAlpha)
+                    }
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

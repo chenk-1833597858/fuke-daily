@@ -62,10 +62,16 @@ data class ContentConfig(
     val parentListId: Long,
     val input1Text: String = "",
     val button1Storage: Int = 0,     // 0=无, 1-5=槽位
+    val input1TextColor: String = "",  // input1文本颜色
+    val input1RefColor: String = "",   // input1引用颜色
     val input2Text: String = "",
     val button2Storage: Int = 0,
+    val input2TextColor: String = "",  // input2文本颜色
+    val input2RefColor: String = "",   // input2引用颜色
     val input3Text: String = "",
     val button3Storage: Int = 0,
+    val input3TextColor: String = "",  // input3文本颜色
+    val input3RefColor: String = "",   // input3引用颜色
 )
 
 // ═══════════════════════════════════════════════════

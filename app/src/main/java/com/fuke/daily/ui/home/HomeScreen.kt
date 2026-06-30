@@ -43,6 +43,8 @@ fun HomeScreen(
     onNavigateToConfig: (String) -> Unit,
     onNavigateToTimer: () -> Unit,
     onNavigateToMainline: () -> Unit,
+    onNavigateToLogs: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onNavigateToMainlineDetail: (Long) -> Unit,
     onNavigateToRichText: (Long) -> Unit,
     onNavigateToQuizConfig: (Long) -> Unit,
@@ -121,11 +123,11 @@ fun HomeScreen(
                     color = FukeTheme.extended.text,
                 )
 
-                // 检查更新按钮
+                // 设置按钮
                 Surface(
                     modifier = Modifier
                         .height(32.dp)
-                        .clickable { doCheckUpdate() },
+                        .clickable { onNavigateToSettings() },
                     shape = RoundedCornerShape(16.dp),
                     color = extended.light,
                     border = BorderStroke(1.dp, extended.border),
@@ -135,30 +137,7 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = if (isChecking) "…" else "⬆",
-                            fontSize = 12.sp,
-                            color = extended.muted,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // 主题切换按钮
-                Surface(
-                    modifier = Modifier
-                        .height(32.dp)
-                        .clickable { viewModel.switchTheme() },
-                    shape = RoundedCornerShape(16.dp),
-                    color = extended.light,
-                    border = BorderStroke(1.dp, extended.border),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = if (uiState.currentTheme == ThemeMode.WARM) "🌙 暗夜" else "☀️ 温暖",
+                            text = "⚙️",
                             fontSize = 12.sp,
                             color = extended.muted,
                         )
@@ -229,7 +208,7 @@ fun HomeScreen(
                     viewModel.setBottomTab(index)
                     when (index) {
                         1 -> onNavigateToTimer()
-                        2 -> onNavigateToMainline()
+                        2 -> onNavigateToLogs()
                     }
                 },
             )

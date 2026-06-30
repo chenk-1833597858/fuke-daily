@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fuke.daily.data.datastore.AppPrefs
 import com.fuke.daily.feature.floating.FloatingWindowService
+import com.fuke.daily.feature.timer.TimerReminderService
 import com.fuke.daily.ui.navigation.AppNavigation
 import com.fuke.daily.ui.theme.FukeDailyTheme
 import com.fuke.daily.ui.theme.ThemeMode
@@ -29,6 +30,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        AppLogger.i("MainActivity: onCreate")
+        
         enableEdgeToEdge()
 
         // Fix 1: 键盘弹起时调整布局，避免遮挡输入框
@@ -60,11 +64,22 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         try {
             if (Settings.canDrawOverlays(this)) {
+                AppLogger.i("MainActivity: starting FloatingWindowService")
                 val intent = Intent(this, FloatingWindowService::class.java)
                 startForegroundService(intent)
+            } else {
+                AppLogger.w("MainActivity: no overlay permission")
             }
         } catch (e: Exception) {
             AppLogger.e("MainActivity: Failed to start FloatingWindowService", e)
+        }
+        
+        // 启动定时服务（如果已创建定时任务）
+        try {
+            AppLogger.i("MainActivity: starting TimerReminderService")
+            TimerReminderService.start(this)
+        } catch (e: Exception) {
+            AppLogger.e("MainActivity: Failed to start TimerReminderService", e)
         }
     }
 }
