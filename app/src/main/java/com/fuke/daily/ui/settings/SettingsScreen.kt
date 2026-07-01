@@ -12,6 +12,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -119,14 +125,76 @@ fun SettingsScreen(
             )
             
             // ── 数据备份与恢复 ──
+            var showBackupDialog by remember { mutableStateOf(false) }
+            
+            // 文件选择器（导入）
+            val importLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent()
+            ) { uri ->
+                uri?.let {
+                    try {
+                        val dbFile = File(context.getDatabasePath("fuke-daily-db").absolutePath)
+                        context.contentResolver.openInputStream(it)?.use { input ->
+                            dbFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        // 重启应用以加载新数据库
+                        val restartIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                        restartIntent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        context.startActivity(restartIntent)
+                        android.os.Process.killProcess(android.os.Process.myPid())
+                    } catch (e: Exception) {
+                        // 导入失败
+                    }
+                }
+            }
+            
             SettingItem(
                 icon = Icons.Filled.Backup,
                 title = "数据备份与恢复",
                 subtitle = "导出/导入 .db 文件",
                 onClick = {
-                    // TODO: 实现数据备份恢复
+                    showBackupDialog = true
                 },
             )
+            
+            // 备份/恢复对话框
+            if (showBackupDialog) {
+                AlertDialog(
+                    onDismissRequest = { showBackupDialog = false },
+                    title = { Text("数据备份与恢复") },
+                    text = { Text("选择操作：导出当前数据或导入备份文件") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showBackupDialog = false
+                                // 导出：复制数据库文件到 Downloads
+                                try {
+                                    val dbFile = File(context.getDatabasePath("fuke-daily-db").absolutePath)
+                                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                                    val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                    val backupFile = File(downloadsDir, "fuke_daily_backup_$dateStr.db")
+                                    dbFile.copyTo(backupFile, overwrite = true)
+                                } catch (_: Exception) {}
+                            }
+                        ) {
+                            Text("导出")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showBackupDialog = false
+                                // 导入：启动文件选择器
+                                importLauncher.launch("*/*")
+                            }
+                        ) {
+                            Text("导入")
+                        }
+                    },
+                )
+            }
         }
     }
 }

@@ -79,6 +79,11 @@ class TimerReminderService : Service() {
         }
         
         // 注册停止闹钟广播接收器
+        // 先注销旧的接收器，防止重复注册
+        try {
+            stopAlarmReceiver?.let { unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        
         stopAlarmReceiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (intent.action == "com.fuke.daily.STOP_ALARM_SOUND") {

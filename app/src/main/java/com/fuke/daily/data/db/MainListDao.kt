@@ -45,6 +45,9 @@ interface MainListDao {
     @Query("SELECT * FROM sub_lists WHERE parentListId = :parentId ORDER BY sortOrder ASC")
     suspend fun getSubListsOnce(parentId: Long): List<SubList>
 
+    @Query("SELECT * FROM sub_lists WHERE id = :subListId LIMIT 1")
+    suspend fun getSubListById(subListId: Long): SubList?
+
     @Insert
     suspend fun insertSubList(subList: SubList): Long
 

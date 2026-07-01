@@ -60,6 +60,24 @@ class ConfigViewModel @Inject constructor(
 
     // ── 子列表 ──
 
+    fun loadSubListById(subListId: Long) {
+        viewModelScope.launch {
+            val subList = repo.getSubListById(subListId)
+            if (subList != null) {
+                _uiState.update { state ->
+                    val updatedList = state.subLists.toMutableList()
+                    val index = updatedList.indexOfFirst { it.id == subListId }
+                    if (index >= 0) {
+                        updatedList[index] = subList
+                    } else {
+                        updatedList.add(subList)
+                    }
+                    state.copy(subLists = updatedList)
+                }
+            }
+        }
+    }
+
     fun loadSubLists(listId: Long) {
         viewModelScope.launch {
             repo.getSubLists(listId).collect { subs ->
@@ -104,6 +122,123 @@ class ConfigViewModel @Inject constructor(
     fun updateSubList(subList: SubList) {
         viewModelScope.launch {
             repo.updateSubList(subList)
+        }
+    }
+
+    fun updateSubListImage(subListId: Long, imageUri: String) {
+        viewModelScope.launch {
+            val subList = _uiState.value.subLists.find { it.id == subListId } ?: return@launch
+            // 将新图片添加到图片列表
+            val currentUris = try {
+                val array = org.json.JSONArray(subList.imageUris)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    list.add(array.getString(i))
+                }
+                list.add(imageUri)
+                list
+            } catch (_: Exception) {
+                listOf(imageUri)
+            }
+            val updated = subList.copy(
+                imageUris = org.json.JSONArray(currentUris).toString(),
+                imageUri = imageUri  // 兼容旧数据
+            )
+            repo.updateSubList(updated)
+            _uiState.update { state ->
+                state.copy(
+                    subLists = state.subLists.map { if (it.id == subListId) updated else it }
+                )
+            }
+        }
+    }
+
+    fun deleteSubListImage(subListId: Long, imageUri: String) {
+        viewModelScope.launch {
+            val subList = _uiState.value.subLists.find { it.id == subListId } ?: return@launch
+            val currentUris = try {
+                val array = org.json.JSONArray(subList.imageUris)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    val uri = array.getString(i)
+                    if (uri != imageUri) list.add(uri)
+                }
+                list
+            } catch (_: Exception) {
+                emptyList<String>()
+            }
+            val updated = subList.copy(
+                imageUris = org.json.JSONArray(currentUris).toString(),
+                imageUri = currentUris.firstOrNull() ?: ""
+            )
+            repo.updateSubList(updated)
+            _uiState.update { state ->
+                state.copy(
+                    subLists = state.subLists.map { if (it.id == subListId) updated else it }
+                )
+            }
+            // 删除本地文件
+            try {
+                val file = java.io.File(imageUri)
+                if (file.exists()) file.delete()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun reorderSubListImages(subListId: Long, fromIndex: Int, toIndex: Int) {
+        viewModelScope.launch {
+            val subList = _uiState.value.subLists.find { it.id == subListId } ?: return@launch
+            val currentUris = try {
+                val array = org.json.JSONArray(subList.imageUris)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    list.add(array.getString(i))
+                }
+                list
+            } catch (_: Exception) {
+                return@launch
+            }
+            if (fromIndex !in currentUris.indices || toIndex !in currentUris.indices) return@launch
+            val mutableList = currentUris.toMutableList()
+            val item = mutableList.removeAt(fromIndex)
+            mutableList.add(toIndex, item)
+            val updated = subList.copy(
+                imageUris = org.json.JSONArray(mutableList).toString(),
+                imageUri = mutableList.firstOrNull() ?: ""
+            )
+            repo.updateSubList(updated)
+            _uiState.update { state ->
+                state.copy(
+                    subLists = state.subLists.map { if (it.id == subListId) updated else it }
+                )
+            }
+        }
+    }
+
+    fun moveSubList(subListId: Long, direction: Int) {
+        viewModelScope.launch {
+            val currentList = _uiState.value.subLists.sortedBy { it.sortOrder }
+            val index = currentList.indexOfFirst { it.id == subListId }
+            if (index == -1) return@launch
+            
+            val newIndex = (index + direction).coerceIn(0, currentList.size - 1)
+            if (newIndex == index) return@launch
+            
+            val mutableList = currentList.toMutableList()
+            val item = mutableList.removeAt(index)
+            mutableList.add(newIndex, item)
+            
+            // 更新所有子列表的 sortOrder
+            mutableList.forEachIndexed { i, subList ->
+                val updated = subList.copy(sortOrder = i)
+                repo.updateSubList(updated)
+            }
+            
+            _uiState.update { state ->
+                state.copy(
+                    subLists = mutableList.mapIndexed { i, it -> it.copy(sortOrder = i) }
+                )
+            }
         }
     }
 

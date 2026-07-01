@@ -41,6 +41,8 @@ class AppPrefs @Inject constructor(
         val MAINLINE_ENABLED = booleanPreferencesKey("mainline_enabled")
         val ICON_POS_X = intPreferencesKey("icon_pos_x")
         val ICON_POS_Y = intPreferencesKey("icon_pos_y")
+        val CAROUSEL_INTERVAL = longPreferencesKey("carousel_interval")
+        val CAROUSEL_ANIMATION = stringPreferencesKey("carousel_animation")
     }
 
     // ── 主题模式 ──
@@ -106,5 +108,23 @@ class AppPrefs @Inject constructor(
             prefs[Keys.ICON_POS_X] = x
             prefs[Keys.ICON_POS_Y] = y
         }
+    }
+
+    // ── 图片轮播设置 ──
+
+    val carouselInterval: Flow<Long> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> prefs[Keys.CAROUSEL_INTERVAL] ?: 1000L }
+
+    suspend fun setCarouselInterval(interval: Long) {
+        dataStore.edit { it[Keys.CAROUSEL_INTERVAL] = interval }
+    }
+
+    val carouselAnimation: Flow<String> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> prefs[Keys.CAROUSEL_ANIMATION] ?: "fade" }
+
+    suspend fun setCarouselAnimation(animation: String) {
+        dataStore.edit { it[Keys.CAROUSEL_ANIMATION] = animation }
     }
 }

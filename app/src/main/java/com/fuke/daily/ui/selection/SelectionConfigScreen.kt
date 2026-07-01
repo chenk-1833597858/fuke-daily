@@ -23,6 +23,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,6 +49,7 @@ import com.fuke.daily.viewmodel.ConfigViewModel
 fun SelectionConfigScreen(
     listId: Long,
     onBack: () -> Unit,
+    onNavigateToImageList: (Long, String, String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ConfigViewModel = hiltViewModel(),
 ) {
@@ -66,6 +71,32 @@ fun SelectionConfigScreen(
     // 选项按钮引用槽弹窗状态
     var showOptionSlotDialog by rememberSaveable { mutableStateOf(false) }
     var optionSlotDialogButton by rememberSaveable { mutableStateOf<OptionButton?>(null) }
+
+    // 图片选择器
+    var imageSelectSubListId by rememberSaveable { mutableStateOf(0L) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            // 将图片复制到内部存储，避免 Content URI 过期
+            try {
+                val inputStream = context.contentResolver.openInputStream(selectedUri)
+                val fileName = "sublist_${imageSelectSubListId}_${System.currentTimeMillis()}.jpg"
+                val destFile = java.io.File(context.filesDir, "images/$fileName")
+                destFile.parentFile?.mkdirs()
+                inputStream?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                viewModel.updateSubListImage(imageSelectSubListId, destFile.absolutePath)
+            } catch (e: Exception) {
+                // 复制失败，回退到直接使用 URI
+                viewModel.updateSubListImage(imageSelectSubListId, selectedUri.toString())
+            }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -133,6 +164,9 @@ fun SelectionConfigScreen(
                         onOptionRefTagClick = { button ->
                             optionSlotDialogButton = button
                             showOptionSlotDialog = true
+                        },
+                        onImageClick = {
+                            onNavigateToImageList(subList.id, subList.name, subList.imageUris)
                         },
                     )
                 }

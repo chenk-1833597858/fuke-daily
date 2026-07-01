@@ -47,9 +47,11 @@ data class SubList(
     val parentListId: Long,
     val name: String = "",
     val fixedSlot: Int = 0,          // 随机列表固定槽位（0=无）
-    val imageUri: String? = null,
+    val imageUri: String? = null,    // 兼容旧数据，单张图片（已废弃，用 imageUris）
+    val imageUris: String = "[]",    // JSON 数组：多张图片 URI 列表
     val imageEnabled: Boolean = true,
     val sortOrder: Int = 0,
+    val carouselInterval: Long = 0,  // 轮播间隔（毫秒），0=使用全局设置
 )
 
 // ═══════════════════════════════════════════════════

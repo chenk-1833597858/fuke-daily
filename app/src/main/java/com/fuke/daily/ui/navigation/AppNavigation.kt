@@ -27,6 +27,7 @@ import com.fuke.daily.ui.settings.SettingsScreen
 import com.fuke.daily.ui.selection.SelectionConfigScreen
 import com.fuke.daily.feature.timer.TimerConfigScreen
 import com.fuke.daily.feature.timer.TimerListScreen
+import com.fuke.daily.ui.imagelist.ImageListScreen
 
 // ═══════════════════════════════════════════════════
 //  路由定义
@@ -48,6 +49,7 @@ object Routes {
     const val MAINLINE_DAILY = "mainline/daily"
     const val LOGS = "logs"
     const val SETTINGS = "settings"
+    const val IMAGE_LIST = "imageList/{subListId}"
 }
 
 // ═══════════════════════════════════════════════════
@@ -111,6 +113,9 @@ fun AppNavigation(
             SelectionConfigScreen(
                 listId = listId,
                 onBack = { navController.popBackStack() },
+                onNavigateToImageList = { subListId, _, _ ->
+                    navController.navigate("imageList/$subListId")
+                },
             )
         }
 
@@ -128,6 +133,9 @@ fun AppNavigation(
             RandomConfigScreen(
                 listId = listId,
                 onBack = { navController.popBackStack() },
+                onNavigateToImageList = { subListId, _, _ ->
+                    navController.navigate("imageList/$subListId")
+                },
                 onNavigateToRichText = { navController.popBackStack() },
             )
         }
@@ -212,6 +220,14 @@ fun AppNavigation(
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToLogs = { navController.navigate(Routes.LOGS) },
+            )
+        }
+
+        composable(Routes.IMAGE_LIST) { backStackEntry ->
+            val subListId = backStackEntry.arguments?.getString("subListId")?.toLongOrNull() ?: 0L
+            ImageListScreen(
+                subListId = subListId,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }

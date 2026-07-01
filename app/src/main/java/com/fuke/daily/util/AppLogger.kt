@@ -25,6 +25,30 @@ object AppLogger {
 
     fun init(context: android.content.Context) {
         logFile = File(context.filesDir, "app_logs.txt")
+        // 启动时从文件加载历史日志
+        loadLogsFromFile()
+    }
+
+    private fun loadLogsFromFile() {
+        val file = logFile ?: return
+        if (!file.exists()) return
+        try {
+            file.readLines().forEach { line ->
+                // 解析格式: "MM-dd HH:mm:ss.SSS D/FukeDaily: message"
+                val regex = Regex("""^(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s+([DIWE])/([^:]+):\s+(.*)$""")
+                val match = regex.find(line)
+                if (match != null) {
+                    val (time, level, tag, message) = match.destructured
+                    memoryLogs.add(LogEntry(time, level, tag, message))
+                }
+            }
+            // 限制内存日志数量
+            while (memoryLogs.size > MAX_MEMORY_LOGS) {
+                memoryLogs.removeAt(0)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "加载历史日志失败", e)
+        }
     }
 
     fun d(msg: String) = log("D", msg)

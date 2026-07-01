@@ -45,6 +45,7 @@ import com.fuke.daily.viewmodel.ConfigViewModel
 fun RandomConfigScreen(
     listId: Long,
     onBack: () -> Unit,
+    onNavigateToImageList: (Long, String, String) -> Unit,
     modifier: Modifier = Modifier,
     onNavigateToRichText: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel(),
@@ -163,6 +164,9 @@ fun RandomConfigScreen(
                         },
                         onFixedSlotChange = { slot ->
                             viewModel.updateFixedSlot(subList, slot)
+                        },
+                        onImageClick = {
+                            onNavigateToImageList(subList.id, subList.name, subList.imageUris)
                         },
                     )
                 }

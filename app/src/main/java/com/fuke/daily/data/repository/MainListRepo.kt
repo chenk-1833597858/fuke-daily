@@ -36,6 +36,8 @@ class MainListRepo @Inject constructor(
 
     suspend fun getSubListsOnce(parentId: Long): List<SubList> = dao.getSubListsOnce(parentId)
 
+    suspend fun getSubListById(subListId: Long): SubList? = dao.getSubListById(subListId)
+
     suspend fun insertSubList(subList: SubList): Long = dao.insertSubList(subList)
 
     suspend fun updateSubList(subList: SubList) = dao.updateSubList(subList)

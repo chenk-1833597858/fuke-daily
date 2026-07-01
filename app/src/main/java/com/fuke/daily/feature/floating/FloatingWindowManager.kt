@@ -33,9 +33,10 @@ class FloatingWindowManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    // ── 洗牌池 ──
-    private var shufflePool: List<Pair<MainList, SubList>> = emptyList()
-    private var currentSubListIndex = -1
+    // ── 项目级别洗牌池（只存 MainList，子列表按顺序取） ──
+    private var mainListShufflePool = listOf<MainList>()
+    private var currentMainListIndex = -1
+    private var currentSubListIndexInMain = -1
 
     // ── 当前展示数据 ──
     private var currentMainList: MainList? = null
@@ -145,46 +146,74 @@ class FloatingWindowManager @Inject constructor(
     fun isPopupVisible(): Boolean = isPopupShowing
 
     // ═══════════════════════════════════════════════════
-    //  洗牌池逻辑
+    //  洗牌池逻辑 — 项目级别随机，子列表按顺序
     // ═══════════════════════════════════════════════════
 
     suspend fun refillShufflePool() {
-        val allPairs = mutableListOf<Pair<MainList, SubList>>()
         val enabledLists = mainListRepo.getAllLists().first()
             .filter { it.isEnabled }
 
-        for (mainList in enabledLists) {
-            val subLists = mainListRepo.getSubListsOnce(mainList.id)
-            for (subList in subLists) {
-                allPairs.add(Pair(mainList, subList))
-            }
-        }
-
-        shufflePool = allPairs.shuffled()
-        currentSubListIndex = -1
-        AppLogger.i("FloatingWindowManager: shuffle pool refilled with ${shufflePool.size} items")
+        // 项目级别洗牌：只随机 MainList 的顺序
+        mainListShufflePool = enabledLists.shuffled()
+        currentMainListIndex = -1
+        currentSubListIndexInMain = -1
+        
+        AppLogger.i("FloatingWindowManager: mainList shuffle pool refilled with ${mainListShufflePool.size} items")
     }
 
     suspend fun nextRandomItem(): Pair<MainList, SubList>? {
-        if (shufflePool.isEmpty() || currentSubListIndex >= shufflePool.size - 1) {
-            refillShufflePool()
-            if (shufflePool.isEmpty()) return null
+        // 如果当前项目的子列表已经遍历完，或者没有当前项目，取下一个项目
+        if (currentMainListIndex < 0 || currentSubListIndexInMain < 0) {
+            // 需要取下一个项目
+            if (mainListShufflePool.isEmpty() || currentMainListIndex >= mainListShufflePool.size - 1) {
+                refillShufflePool()
+                if (mainListShufflePool.isEmpty()) return null
+            }
+            currentMainListIndex++
+            currentSubListIndexInMain = 0
         }
-        currentSubListIndex++
-        return shufflePool[currentSubListIndex]
+
+        val mainList = mainListShufflePool[currentMainListIndex]
+        val subLists = mainListRepo.getSubListsOnce(mainList.id)
+        
+        if (currentSubListIndexInMain >= subLists.size) {
+            // 当前项目的子列表已遍历完，取下一个项目
+            if (currentMainListIndex >= mainListShufflePool.size - 1) {
+                refillShufflePool()
+                if (mainListShufflePool.isEmpty()) return null
+                currentMainListIndex = 0
+            } else {
+                currentMainListIndex++
+            }
+            currentSubListIndexInMain = 0
+            return nextRandomItem() // 递归取下一个
+        }
+
+        val subList = subLists[currentSubListIndexInMain]
+        currentSubListIndexInMain++
+        return Pair(mainList, subList)
     }
 
     /**
      * 双击打开弹窗时调用：重置洗牌池，返回第一个启用项目的第一个子列表
-     * 每次调用都重新查库，实时反映开关/删除变化
+     * 项目随机，但每个项目内从子列表1开始按顺序
      */
     suspend fun loadFirstEnabledItem(): Pair<MainList, SubList>? {
         refillShufflePool()
-        if (shufflePool.isEmpty()) return null
+        if (mainListShufflePool.isEmpty()) return null
 
-        // 每次双击都随机，从洗牌池取第一个（池已shuffled）
-        currentSubListIndex = 0
-        return shufflePool[0]
+        // 取第一个项目（已洗牌），从该项目的第一个子列表开始
+        currentMainListIndex = 0
+        currentSubListIndexInMain = 0
+        
+        val mainList = mainListShufflePool[0]
+        val subLists = mainListRepo.getSubListsOnce(mainList.id)
+        if (subLists.isEmpty()) {
+            // 如果第一个项目没有子列表，尝试下一个
+            return nextRandomItem()
+        }
+        
+        return Pair(mainList, subLists[0])
     }
 
     // ═══════════════════════════════════════════════════
@@ -287,8 +316,9 @@ class FloatingWindowManager @Inject constructor(
         hideIcon()
         context = null
         windowManager = null
-        shufflePool = emptyList()
-        currentSubListIndex = -1
+        mainListShufflePool = emptyList()
+        currentMainListIndex = -1
+        currentSubListIndexInMain = -1
         fixedSlotLines = emptyList()
         fixedSlotLineIndex = 0
     }

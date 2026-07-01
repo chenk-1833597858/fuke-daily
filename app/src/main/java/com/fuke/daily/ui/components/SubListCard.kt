@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -64,6 +66,7 @@ fun SubListCard(
     onDeleteOptionButton: (OptionButton) -> Unit = {},
     onOptionRefTagClick: (OptionButton) -> Unit = {},
     onFixedSlotChange: (Int) -> Unit = {},
+    onImageClick: () -> Unit = {},
 ) {
     val extended = FukeTheme.extended
 
@@ -83,11 +86,12 @@ fun SubListCard(
         border = BorderStroke(1.dp, extended.border),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // ── 第1行：序号 + 名称 + 删除 ──
+            // ── 第1行：序号名称 + 排序按钮 + 删除 + 图片（右边） ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // 序号 + 名称
                 Surface(
                     modifier = Modifier.size(28.dp),
                     shape = RoundedCornerShape(6.dp),
@@ -98,7 +102,7 @@ fun SubListCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
 
                 if (isEditingName) {
                     val nameShape = RoundedCornerShape(6.dp)
@@ -148,11 +152,43 @@ fun SubListCard(
                     )
                 }
 
-                // 删除按钮 — 醒目的×
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // 右侧图片缩略图（48dp）
+                val firstImageUri = remember(subList.imageUris) {
+                    try {
+                        val uris = org.json.JSONArray(subList.imageUris)
+                        if (uris.length() > 0) uris.getString(0) else null
+                    } catch (_: Exception) { null }
+                }
+                
                 Surface(
                     modifier = Modifier
-                        .size(24.dp)
-                        .clickable(onClick = onDelete),
+                        .size(48.dp)
+                        .clickable { onImageClick() },
+                    shape = RoundedCornerShape(8.dp),
+                    color = extended.contentBg,
+                    border = BorderStroke(1.dp, extended.border.copy(alpha = 0.5f)),
+                ) {
+                    if (firstImageUri != null) {
+                        coil.compose.AsyncImage(
+                            model = firstImageUri,
+                            contentDescription = "子列表图片",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        )
+                    } else {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "+", fontSize = 20.sp, color = extended.muted.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // 删除按钮
+                Surface(
+                    modifier = Modifier.size(24.dp).clickable(onClick = onDelete),
                     shape = RoundedCornerShape(12.dp),
                     color = extended.light,
                 ) {
@@ -162,7 +198,7 @@ fun SubListCard(
                 }
             }
 
-            // ── 第2行：固定槽（靠左） ... 图片选择（靠右） ──
+            // ── 第2行：固定槽（靠左） ──
             if (showFixedSlot && fixedSlotCount > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -188,41 +224,6 @@ fun SubListCard(
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
-
-                    // 图片选择靠右
-                    Surface(
-                        modifier = Modifier
-                            .size(width = 60.dp, height = 42.dp)
-                            .clickable { /* 预留以后添加图片功能 */ },
-                        shape = RoundedCornerShape(6.dp),
-                        color = extended.contentBg,
-                        border = BorderStroke(1.dp, extended.border.copy(alpha = 0.5f)),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = "选图", fontSize = 11.sp, color = extended.muted.copy(alpha = 0.5f))
-                        }
-                    }
-                }
-            } else {
-                // 非随机列表也显示选图，靠右
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    Surface(
-                        modifier = Modifier
-                            .size(width = 60.dp, height = 42.dp)
-                            .clickable { /* 预留以后添加图片功能 */ },
-                        shape = RoundedCornerShape(6.dp),
-                        color = extended.contentBg,
-                        border = BorderStroke(1.dp, extended.border.copy(alpha = 0.5f)),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = "选图", fontSize = 11.sp, color = extended.muted.copy(alpha = 0.5f))
-                        }
-                    }
                 }
             }
 

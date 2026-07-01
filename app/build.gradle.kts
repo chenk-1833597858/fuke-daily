@@ -13,8 +13,8 @@ android {
         applicationId = "com.fuke.daily"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -110,6 +110,12 @@ dependencies {
 
     // Serialization (for LinkRecord path JSON)
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // Image loading (Coil)
+    implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Image Cropper (CanHub fork - actively maintained)
+    implementation("com.github.CanHub:Android-Image-Cropper:4.0.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

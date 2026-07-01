@@ -33,9 +33,8 @@ class MainActivity : ComponentActivity() {
         
         AppLogger.i("MainActivity: onCreate")
         
-        enableEdgeToEdge()
-
-        // Fix 1: 键盘弹起时调整布局，避免遮挡输入框
+        // Fix: 键盘弹起时调整布局，避免遮挡输入框
+        // 不使用 enableEdgeToEdge()，避免与 adjustResize 冲突
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         val hasOverlay = Settings.canDrawOverlays(this)

@@ -28,9 +28,10 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.fuke.daily.feature.timer.TimerReminderService
 import com.fuke.daily.MainActivity
 import com.fuke.daily.data.datastore.AppPrefs
-import com.fuke.daily.data.model.ColoredContent
-import com.fuke.daily.data.model.ColoredContentLine
-import com.fuke.daily.data.model.ColoredTextSegment
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import com.fuke.daily.data.model.ContentConfig
 import com.fuke.daily.data.model.ListType
 import com.fuke.daily.data.model.OptionButton
@@ -45,8 +46,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -93,15 +96,20 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
     // ── 状态 ──
     private val _isPopupVisible = MutableStateFlow(false)
-    private val _currentContent = MutableStateFlow<ColoredContent>(emptyList())
+    private val _currentContent = MutableStateFlow(AnnotatedString(""))
     private val _currentButtons = MutableStateFlow<List<OptionButton>>(emptyList())
     private val _activeButtons = MutableStateFlow(0)
     private val _currentImageUri = MutableStateFlow<String?>(null)
     private val _currentImageEnabled = MutableStateFlow(true)
+    private val _currentImageUris = MutableStateFlow<List<String>>(emptyList())
+    private val _currentImageIndex = MutableStateFlow(0)
     private val _themeMode = MutableStateFlow(ThemeMode.WARM)
     private val _currentListType = MutableStateFlow(ListType.SELECTION)
     private val _currentQuizCards = MutableStateFlow<List<QuizCard>>(emptyList())
     private val _isIconFlashing = MutableStateFlow(false)
+
+    // ── 轮播 ──
+    private var carouselJob: kotlinx.coroutines.Job? = null
 
     // ── 拖动 + 双击 ──
     private var isDragging = false
@@ -402,6 +410,8 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     val activeButtons by _activeButtons.collectAsState()
                     val imageUri by _currentImageUri.collectAsState()
                     val imageEnabled by _currentImageEnabled.collectAsState()
+                    val imageUris by _currentImageUris.collectAsState()
+                    val imageIndex by _currentImageIndex.collectAsState()
                     val listType by _currentListType.collectAsState()
                     val quizCards by _currentQuizCards.collectAsState()
 
@@ -413,6 +423,8 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                             activeButtons = activeButtons,
                             imageUri = imageUri,
                             imageEnabled = imageEnabled,
+                            imageUris = imageUris,
+                            imageIndex = imageIndex,
                             listType = listType,
                             quizCards = quizCards,
                             onQuizNext = {
@@ -436,8 +448,26 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
             _isPopupVisible.value = true
             // 双击打开：加载第一个启用项目的第一个子列表
             loadFirstItem()
+            // 启动轮播
+            startCarousel()
         } catch (e: Exception) {
             AppLogger.e("FloatingWindowService: showPopup failed", e)
+        }
+    }
+
+    private fun startCarousel() {
+        carouselJob?.cancel()
+        carouselJob = serviceScope.launch {
+            while (isActive) {
+                delay(3000) // 3秒切换一次
+                val imageUris = _currentImageUris.value
+                if (imageUris.size > 1) {
+                    val nextIndex = (_currentImageIndex.value + 1) % imageUris.size
+                    _currentImageIndex.value = nextIndex
+                    _currentImageUri.value = imageUris[nextIndex]
+                    AppLogger.d("Carousel: switched to image $nextIndex/${imageUris.size}")
+                }
+            }
         }
     }
 
@@ -463,6 +493,10 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         _isPopupVisible.value = false
         popupComposeView = null
         popupParams = null
+
+        // 停止轮播
+        carouselJob?.cancel()
+        carouselJob = null
 
         // 恢复悬浮图标
         floatingWindowManager.setIconVisibility(true)
@@ -496,7 +530,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     val cards = floatingWindowManager.loadQuizCards(mainList.id)
                     _currentListType.value = ListType.QUIZ
                     _currentQuizCards.value = cards
-                    _currentContent.value = emptyList()
+                    _currentContent.value = AnnotatedString("")
                     _currentButtons.value = emptyList()
                     _currentImageUri.value = null
                     _currentImageEnabled.value = true
@@ -517,7 +551,20 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
                     _currentContent.value = content
                     _currentButtons.value = buttons
-                    _currentImageUri.value = subList.imageUri
+                    // 从 imageUris 解析图片列表
+                    val imageUris = try {
+                        val array = org.json.JSONArray(subList.imageUris)
+                        val list = mutableListOf<String>()
+                        for (i in 0 until array.length()) {
+                            list.add(array.getString(i))
+                        }
+                        list
+                    } catch (_: Exception) {
+                        emptyList<String>()
+                    }
+                    _currentImageUris.value = imageUris
+                    _currentImageIndex.value = 0
+                    _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
                     _currentImageEnabled.value = subList.imageEnabled
                 }
             } catch (e: Exception) {
@@ -537,7 +584,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                 val result = floatingWindowManager.loadFirstEnabledItem()
                 if (result == null) {
                     AppLogger.w("FloatingWindowService: no enabled items")
-                    _currentContent.value = emptyList()
+                    _currentContent.value = AnnotatedString("")
                     _currentButtons.value = emptyList()
                     _currentQuizCards.value = emptyList()
                     return@launch
@@ -550,7 +597,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     val cards = floatingWindowManager.loadQuizCards(mainList.id)
                     _currentListType.value = ListType.QUIZ
                     _currentQuizCards.value = cards
-                    _currentContent.value = emptyList()
+                    _currentContent.value = AnnotatedString("")
                     _currentButtons.value = emptyList()
                     _currentImageUri.value = null
                     _currentImageEnabled.value = true
@@ -570,7 +617,20 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
                     _currentContent.value = content
                     _currentButtons.value = buttons
-                    _currentImageUri.value = subList.imageUri
+                    // 从 imageUris 解析图片列表
+                    val imageUris = try {
+                        val array = org.json.JSONArray(subList.imageUris)
+                        val list = mutableListOf<String>()
+                        for (i in 0 until array.length()) {
+                            list.add(array.getString(i))
+                        }
+                        list
+                    } catch (_: Exception) {
+                        emptyList<String>()
+                    }
+                    _currentImageUris.value = imageUris
+                    _currentImageIndex.value = 0
+                    _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
                     _currentImageEnabled.value = subList.imageEnabled
                 }
             } catch (e: Exception) {
@@ -584,59 +644,56 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         config: ContentConfig,
         storageData: com.fuke.daily.data.model.StorageData,
         fixedSlotData: String,
-    ): ColoredContent {
-        val lines = mutableListOf<ColoredContentLine>()
+    ): AnnotatedString {
+        return buildAnnotatedString {
+            // 行1: input1 + storageData[button1Storage]
+            val line1Suffix = if (config.button1Storage > 0) storageData.getSlot(config.button1Storage) else ""
+            appendLineWithColor(config.input1Text, line1Suffix, config.input1TextColor, config.input1RefColor)
 
-        // 行1: input1 + storageData[button1Storage]
-        val line1 = buildLine(
-            config.input1Text,
-            if (config.button1Storage > 0) storageData.getSlot(config.button1Storage) else "",
-            config.input1TextColor,
-            config.input1RefColor,
-        )
-        if (line1.segments.isNotEmpty()) lines.add(line1)
+            // 行2: input2 + (fixedSlotData or storageData[button2Storage])
+            val line2Suffix = if (subList.fixedSlot > 0 && fixedSlotData.isNotBlank()) {
+                fixedSlotData
+            } else if (config.button2Storage > 0) {
+                storageData.getSlot(config.button2Storage)
+            } else ""
+            appendLineWithColor(config.input2Text, line2Suffix, config.input2TextColor, config.input2RefColor)
 
-        // 行2: input2 + (fixedSlotData or storageData[button2Storage])
-        val line2Suffix = if (subList.fixedSlot > 0 && fixedSlotData.isNotBlank()) {
-            fixedSlotData
-        } else if (config.button2Storage > 0) {
-            storageData.getSlot(config.button2Storage)
-        } else ""
-        val line2 = buildLine(config.input2Text, line2Suffix, config.input2TextColor, config.input2RefColor)
-        if (line2.segments.isNotEmpty()) lines.add(line2)
-
-        // 行3: input3 + storageData[button3Storage]
-        val line3 = buildLine(
-            config.input3Text,
-            if (config.button3Storage > 0) storageData.getSlot(config.button3Storage) else "",
-            config.input3TextColor,
-            config.input3RefColor,
-        )
-        if (line3.segments.isNotEmpty()) lines.add(line3)
-
-        return lines
+            // 行3: input3 + storageData[button3Storage]
+            val line3Suffix = if (config.button3Storage > 0) storageData.getSlot(config.button3Storage) else ""
+            appendLineWithColor(config.input3Text, line3Suffix, config.input3TextColor, config.input3RefColor)
+        }
     }
 
-    private fun buildLine(prefix: String, suffix: String, textColor: String, refColor: String): ColoredContentLine {
-        val segments = mutableListOf<ColoredTextSegment>()
+    private fun AnnotatedString.Builder.appendLineWithColor(
+        prefix: String,
+        suffix: String,
+        textColor: String,
+        refColor: String,
+    ) {
         val textColorParsed = parseColor(textColor)
         val refColorParsed = parseColor(refColor)
 
         when {
             prefix.isBlank() && suffix.isBlank() -> {}
             prefix.isBlank() -> {
-                segments.add(ColoredTextSegment(suffix, refColorParsed))
+                withStyle(style = SpanStyle(color = refColorParsed)) {
+                    append(suffix)
+                }
             }
             suffix.isBlank() -> {
-                segments.add(ColoredTextSegment(prefix, textColorParsed))
+                withStyle(style = SpanStyle(color = textColorParsed)) {
+                    append(prefix)
+                }
             }
             else -> {
-                segments.add(ColoredTextSegment(prefix, textColorParsed))
-                segments.add(ColoredTextSegment(suffix, refColorParsed))
+                withStyle(style = SpanStyle(color = textColorParsed)) {
+                    append(prefix)
+                }
+                withStyle(style = SpanStyle(color = refColorParsed)) {
+                    append(suffix)
+                }
             }
         }
-
-        return ColoredContentLine(segments)
     }
 
     private fun parseColor(colorString: String): androidx.compose.ui.graphics.Color {
@@ -688,7 +745,20 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
                             _currentContent.value = content
                             _currentButtons.value = buttons
-                            _currentImageUri.value = subList.imageUri
+                            // 从 imageUris 解析图片列表
+                            val imageUris = try {
+                                val array = org.json.JSONArray(subList.imageUris)
+                                val list = mutableListOf<String>()
+                                for (i in 0 until array.length()) {
+                                    list.add(array.getString(i))
+                                }
+                                list
+                            } catch (_: Exception) {
+                                emptyList<String>()
+                            }
+                            _currentImageUris.value = imageUris
+                            _currentImageIndex.value = 0
+                            _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
                             _currentImageEnabled.value = subList.imageEnabled
                         }
                     } catch (e: Exception) {

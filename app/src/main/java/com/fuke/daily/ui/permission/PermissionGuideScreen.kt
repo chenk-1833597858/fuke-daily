@@ -205,6 +205,58 @@ fun PermissionGuideScreen(
             },
         )
 
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 电池优化白名单
+        var hasBatteryWhitelist by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            hasBatteryWhitelist = powerManager.isIgnoringBatteryOptimizations(context.packageName)
+        }
+        PermissionCard(
+            title = "电池优化白名单",
+            description = "防止系统后台杀死应用，确保定时任务和悬浮窗正常运行",
+            isRequired = false,
+            isGranted = hasBatteryWhitelist,
+            onOpenSettings = {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                }
+                try {
+                    context.startActivity(intent)
+                } catch (_: Exception) {}
+            },
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 自启动权限
+        PermissionCard(
+            title = "自启动权限",
+            description = "允许应用开机自启动，确保定时任务和悬浮窗在重启后自动恢复",
+            subtitle = "部分国产 ROM 需要手动设置",
+            isRequired = false,
+            isGranted = false, // 无法直接检测，引导用户手动设置
+            onOpenSettings = {
+                // 尝试打开自启动设置页面（不同厂商路径不同）
+                val intents = listOf(
+                    Intent("miui.intent.action.OP_AUTO_START").addCategory(Intent.CATEGORY_DEFAULT),
+                    Intent("com.huawei.systemmanager.optimize.process.ProtectActivity"),
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    },
+                )
+                for (intent in intents) {
+                    try {
+                        context.startActivity(intent)
+                        break
+                    } catch (_: Exception) {
+                        continue
+                    }
+                }
+            },
+        )
+
         Spacer(modifier = Modifier.weight(1f))
 
         // ── 底部按钮 ──

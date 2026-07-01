@@ -1,12 +1,15 @@
 package com.fuke.daily.floating
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.with
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +47,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,8 +62,12 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
-import com.fuke.daily.data.model.ColoredContent
-import com.fuke.daily.data.model.ColoredTextSegment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import com.fuke.daily.data.model.ListType
 import com.fuke.daily.data.model.OptionButton
 import com.fuke.daily.data.model.QuizCard
@@ -76,12 +86,14 @@ import com.fuke.daily.ui.theme.FukeTheme
 @Composable
 fun FloatingPopup(
     modifier: Modifier = Modifier,
-    content: ColoredContent = emptyList(),
+    content: AnnotatedString = AnnotatedString(""),
     buttons: List<OptionButton> = emptyList(),
     activeButtons: Int = 0,
     isVisible: Boolean = true,
     imageUri: String? = null,
     imageEnabled: Boolean = true,
+    imageUris: List<String> = emptyList(),
+    imageIndex: Int = 0,
     listType: ListType = ListType.SELECTION,
     quizCards: List<QuizCard> = emptyList(),
     onQuizNext: () -> Unit = {},
@@ -90,6 +102,18 @@ fun FloatingPopup(
     onDismiss: () -> Unit = {},
 ) {
     val isQuizMode = listType == ListType.QUIZ && quizCards.isNotEmpty()
+    
+    // 获取屏幕尺寸
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val popupWidth = screenWidth.coerceAtMost(400.dp)
+    val halfScreenHeight = screenHeight / 2
+    
+    // 图片展示区域（弹窗上方，独立显示）
+    val validImageUri = remember(imageUri, imageEnabled) {
+        if (imageEnabled) imageUri?.takeIf { it.isNotBlank() } else null
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         // 遮罩层
@@ -106,6 +130,23 @@ fun FloatingPopup(
                         onDismiss()
                     },
             )
+        }
+
+        // 图片在弹窗上方显示（独立于弹窗动画）
+        if (validImageUri != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2f)
+                    .padding(top = 48.dp), // 顶部留出更多空间
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                FloatingImage(
+                    imageUri = validImageUri,
+                    imageUris = imageUris,
+                    imageIndex = imageIndex,
+                )
+            }
         }
 
         // 底部弹窗内容
@@ -129,15 +170,20 @@ fun FloatingPopup(
                     onNextQuiz = onQuizNext,
                 )
             } else {
-                BottomSheetContent(
-                    content = content,
-                    buttons = buttons,
-                    activeButtons = activeButtons,
-                    imageUri = imageUri,
-                    imageEnabled = imageEnabled,
-                    onContentButtonClick = onContentButtonClick,
-                    onButtonClick = onButtonClick,
-                )
+                Column(
+                    modifier = Modifier
+                        .width(popupWidth)
+                        .heightIn(min = halfScreenHeight, max = screenHeight * 0.9f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    BottomSheetContent(
+                        content = content,
+                        buttons = buttons,
+                        activeButtons = activeButtons,
+                        onContentButtonClick = onContentButtonClick,
+                        onButtonClick = onButtonClick,
+                    )
+                }
             }
         }
     }
@@ -145,21 +191,24 @@ fun FloatingPopup(
 
 @Composable
 private fun BottomSheetContent(
-    content: ColoredContent,
+    content: AnnotatedString,
     buttons: List<OptionButton>,
     activeButtons: Int,
-    imageUri: String?,
-    imageEnabled: Boolean,
     onContentButtonClick: (Int) -> Unit,
     onButtonClick: (OptionButton) -> Unit,
 ) {
     val extended = FukeTheme.extended
     val popupWidth = 380.dp
+    
+    // 获取屏幕高度的一半
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val halfScreenHeight = screenHeight / 2
 
     Surface(
         modifier = Modifier
             .width(popupWidth)
-            .heightIn(min = 200.dp, max = 500.dp)
+            .heightIn(min = halfScreenHeight, max = screenHeight * 0.9f)
             .shadow(
                 elevation = 12.dp,
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -185,16 +234,6 @@ private fun BottomSheetContent(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // 图片占位区域（Fix 7）
-            ImagePlaceholder(
-                imageUri = imageUri,
-                imageEnabled = imageEnabled,
-            )
-
-            if (imageUri != null && imageEnabled) {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
             // 内容框
             if (content.isNotEmpty()) {
@@ -223,42 +262,115 @@ private fun BottomSheetContent(
 }
 
 // ═══════════════════════════════════════════════════
-//  图片占位区域（Fix 7）
+//  悬浮窗图片组件
 // ═══════════════════════════════════════════════════
 
 @Composable
-private fun ImagePlaceholder(
-    imageUri: String?,
-    imageEnabled: Boolean,
+private fun FloatingImage(
+    imageUri: String,
+    imageUris: List<String> = emptyList(),
+    imageIndex: Int = 0,
+    modifier: Modifier = Modifier
 ) {
-    val extended = FukeTheme.extended
-
-    // 如果有图片且启用，暂不渲染（预留以后添加图片功能）
-    // 显示占位图标
-    if (imageUri != null && imageUri.isNotBlank() && imageEnabled) {
-        // 图片区域占位
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(80.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(extended.contentBg)
-                .then(
-                    Modifier.drawDashedBorder(
-                        color = extended.border,
-                        strokeWidth = 1.dp,
-                        dashLength = 6.dp,
-                        gapLength = 4.dp,
-                        cornerRadius = 8.dp,
-                    )
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "🖼",
-                fontSize = 28.sp,
+    // 获取屏幕尺寸
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp.dp
+    val screenHeightDp = configuration.screenHeightDp.dp
+    
+    // 图片最大宽度为屏幕宽度的 80%
+    val imageMaxWidth = screenWidthDp * 0.8f
+    // 图片最大高度为屏幕高度的 35%
+    val imageMaxHeight = screenHeightDp * 0.35f
+    
+    // 安全检查：确保 URI 非空且非空白
+    if (imageUri.isBlank()) {
+        android.util.Log.w("FloatingImage", "图片 URI 为空，跳过渲染")
+        return
+    }
+    
+    android.util.Log.d("FloatingImage", "开始加载图片: $imageUri")
+    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isInternalPath = imageUri.startsWith(context.filesDir.absolutePath)
+    
+    // 使用 Box 包裹，让遮罩跟随图片大小
+    Box(
+        modifier = modifier
+            .width(imageMaxWidth)
+            .height(imageMaxHeight) // 固定高度，避免抖动
+            .shadow(
+                elevation = 16.dp,
+                shape = RoundedCornerShape(16.dp),
+                clip = false
             )
+            .pointerInput(Unit) {
+                // 拦截点击事件，防止穿透到遮罩层
+                // 使用 detectTapGestures 来消费所有点击事件
+                detectTapGestures { }
+            }
+    ) {
+        // 使用 Crossfade 实现图片切换动画
+        Crossfade(
+            targetState = imageUri,
+            animationSpec = tween(durationMillis = 500),
+            label = "imageCrossfade",
+        ) { currentUri ->
+            var isLoaded by remember { mutableStateOf(false) }
+            
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = if (isInternalPath) java.io.File(currentUri) else currentUri,
+                    contentDescription = "子列表图片",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = imageMaxHeight)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surface),
+                    // 使用 Fit 让竖向/横向图片都能适应显示
+                    contentScale = ContentScale.Fit,
+                    // 错误处理：加载失败时静默处理
+                    onError = {
+                        android.util.Log.e("FloatingImage", "图片加载失败: ${it.result.throwable}")
+                        isLoaded = true
+                    },
+                    onSuccess = {
+                        android.util.Log.d("FloatingImage", "图片加载成功: $currentUri, 尺寸: ${it.result.drawable?.intrinsicWidth}x${it.result.drawable?.intrinsicHeight}")
+                        isLoaded = true
+                    }
+                )
+                
+                // 加载占位
+                if (!isLoaded) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                    )
+                }
+            }
+        }
+        
+        // 轮播指示器
+        if (imageUris.size > 1) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                imageUris.forEachIndexed { index, _ ->
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                if (index == imageIndex) androidx.compose.ui.graphics.Color.White
+                                else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f)
+                            )
+                    )
+                }
+            }
         }
     }
 }
@@ -269,13 +381,12 @@ private fun ImagePlaceholder(
 
 @Composable
 private fun ContentBox(
-    content: ColoredContent,
+    content: AnnotatedString,
     activeButtons: Int,
     onButtonClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val extended = FukeTheme.extended
-    val scrollState = rememberScrollState()
 
     Box(
         modifier = modifier
@@ -285,31 +396,11 @@ private fun ContentBox(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier.verticalScroll(scrollState),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            content.forEachIndexed { lineIndex, line ->
-                if (lineIndex > 0) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    line.segments.forEach { segment ->
-                        val textColor = if (segment.color != Color.Unspecified) segment.color else extended.text
-                        Text(
-                            text = segment.text,
-                            fontSize = 18.sp,
-                            color = textColor,
-                        )
-                    }
-                }
-            }
-        }
+        Text(
+            text = content,
+            fontSize = 18.sp,
+            color = extended.text,
+        )
     }
 }
 
@@ -525,6 +616,11 @@ private fun QuizBottomSheet(
 ) {
     val extended = FukeTheme.extended
     val popupWidth = 380.dp
+    
+    // 获取屏幕高度的一半
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val halfScreenHeight = screenHeight / 2
 
     // ── 卡片池状态 ──
     var currentPool by remember(cards) { mutableStateOf(cards.shuffled()) }
@@ -539,7 +635,7 @@ private fun QuizBottomSheet(
     Surface(
         modifier = Modifier
             .width(popupWidth)
-            .heightIn(min = 200.dp, max = 500.dp)
+            .heightIn(min = halfScreenHeight, max = screenHeight * 0.9f)
             .shadow(
                 elevation = 12.dp,
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
