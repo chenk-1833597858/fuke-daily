@@ -176,7 +176,6 @@ fun CropImageDialog(
                             drawImage(
                                 image = imageBitmap!!,
                                 topLeft = Offset(imgLeft, imgTop),
-                                size = Size(displayedWidth, displayedHeight),
                             )
                         }
                     }

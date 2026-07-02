@@ -9,6 +9,7 @@ import com.fuke.daily.data.model.MainlineItem
 import com.fuke.daily.data.model.MainList
 import com.fuke.daily.data.repository.MainListRepo
 import com.fuke.daily.data.repository.MainlineRepo
+import com.fuke.daily.util.AppLogger
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,7 +58,11 @@ class MainlineViewModel @Inject constructor(
     // ── 加载主线数据 ──
 
     fun loadMainline(listId: Long) {
-        if (currentListId == listId) return
+        if (currentListId == listId) {
+            // 即使 listId 相同，也重新加载数据（用于刷新）
+            reloadAll(listId)
+            return
+        }
         currentListId = listId
         reloadAll(listId)
     }
@@ -99,6 +104,7 @@ class MainlineViewModel @Inject constructor(
     fun loadLinkHistory() {
         viewModelScope.launch {
             val records = mainlineRepo.getRecentRecordsPerDay(7)
+            AppLogger.i("MainlineViewModel: loadLinkHistory loaded ${records.size} records")
             val entries = records.map { record ->
                 LinkHistoryEntry(
                     id = record.id,
@@ -113,17 +119,20 @@ class MainlineViewModel @Inject constructor(
 
     fun loadTodayLinks(date: String) {
         viewModelScope.launch {
-            mainlineRepo.getRecordsByDate(date).collect { records ->
-                val entries = records.map { record ->
-                    LinkHistoryEntry(
-                        id = record.id,
-                        path = parsePath(record.path),
-                        date = record.date,
-                        timestamp = record.timestamp,
-                    )
-                }
-                _uiState.update { it.copy(todayLinks = entries) }
+            val records = mainlineRepo.getRecordsByDate(date).first()
+            AppLogger.i("MainlineViewModel: loadTodayLinks for date=$date, records=${records.size}")
+            records.forEach { record ->
+                AppLogger.i("MainlineViewModel: record path=${record.path}")
             }
+            val entries = records.map { record ->
+                LinkHistoryEntry(
+                    id = record.id,
+                    path = parsePath(record.path),
+                    date = record.date,
+                    timestamp = record.timestamp,
+                )
+            }
+            _uiState.update { it.copy(todayLinks = entries) }
         }
     }
 
@@ -315,14 +324,20 @@ class MainlineViewModel @Inject constructor(
 
     private fun parsePath(json: String): List<Pair<Long, String>> {
         return try {
-            val type = object : TypeToken<List<Map<String, Any>>>() {}.type
-            val list: List<Map<String, Any>> = gson.fromJson(json, type)
-            list.mapNotNull { map ->
-                val id = (map["id"] as? Number)?.toLong() ?: return@mapNotNull null
-                val name = map["name"] as? String ?: return@mapNotNull null
-                id to name
+            AppLogger.i("MainlineViewModel: parsePath input=$json")
+            // 使用 JSONArray 手动解析，避免 TypeToken 问题
+            val list = org.json.JSONArray(json)
+            val result = mutableListOf<Pair<Long, String>>()
+            for (i in 0 until list.length()) {
+                val obj = list.getJSONObject(i)
+                val id = obj.getLong("id")
+                val name = obj.getString("name")
+                result.add(id to name)
             }
-        } catch (_: Exception) {
+            AppLogger.i("MainlineViewModel: parsePath result=$result")
+            result
+        } catch (e: Exception) {
+            AppLogger.e("MainlineViewModel: parsePath failed", e)
             emptyList()
         }
     }

@@ -8,12 +8,16 @@ import com.fuke.daily.data.model.MainlineItem
 import com.fuke.daily.data.model.MainList
 import com.fuke.daily.data.repository.MainListRepo
 import com.fuke.daily.data.repository.MainlineRepo
+import com.fuke.daily.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 // ═══════════════════════════════════════════════════
@@ -26,6 +30,9 @@ data class MainlineDailyUiState(
     val items: Map<Long, List<MainlineItem>> = emptyMap(),
     val isLoading: Boolean = true,
     val isEveningSession: Boolean = false,   // true=晚间回顾模式，false=早间选路模式
+    val sessionLabel: String = "",             // 当前时段标签
+    val hasTriggeredToday: Boolean = false,    // 今天是否已经手动触发过
+    val shouldAutoTrigger: Boolean = false,   // 是否应该自动触发（进入应用时检查）
 )
 
 // ═══════════════════════════════════════════════════
@@ -54,15 +61,53 @@ class MainlineDailyViewModel @Inject constructor(
         if (loaded) return
         loaded = true
 
-        // 判断当前是选路时段还是回顾时段
-        val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        var eveningHour = 21  // 默认值
-        // 先同步获取晚间时段配置
         viewModelScope.launch {
+            // 获取配置
+            var eveningHour = 21
+            var lastMorningDate = ""
+            var lastEveningDate = ""
+            var autoTriggerDate = ""
+            
             appPrefs.mainlineConfig.collect { config ->
                 eveningHour = config.eveningHour
+                lastMorningDate = config.lastMorningDate
+                lastEveningDate = config.lastEveningDate
+                autoTriggerDate = config.autoTriggerDate
+                
+                val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                val isEvening = currentHour >= eveningHour
+                val isMorning = currentHour < eveningHour
+                
+                // 获取今天的日期
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
+                
+                // 判断今天是否已经手动触发过
+                val hasTriggeredToday = when {
+                    isEvening -> lastEveningDate == today
+                    isMorning -> lastMorningDate == today
+                    else -> false
+                }
+                
+                // 判断是否应该自动触发（今天还没有自动触发过）
+                val shouldAutoTrigger = autoTriggerDate != today && !hasTriggeredToday
+                
+                // 时段标签
+                val sessionLabel = when {
+                    isEvening -> "晚间回顾"
+                    isMorning -> "早间选路"
+                    else -> ""
+                }
+                
+                AppLogger.d("MainlineDaily: 当前时段=$sessionLabel, 今天=$today, " +
+                    "lastMorningDate=$lastMorningDate, lastEveningDate=$lastEveningDate, " +
+                    "autoTriggerDate=$autoTriggerDate, hasTriggeredToday=$hasTriggeredToday, " +
+                    "shouldAutoTrigger=$shouldAutoTrigger")
+                
                 _uiState.update { it.copy(
-                    isEveningSession = currentHour >= eveningHour,
+                    isEveningSession = isEvening,
+                    sessionLabel = sessionLabel,
+                    hasTriggeredToday = hasTriggeredToday,
+                    shouldAutoTrigger = shouldAutoTrigger,
                 ) }
             }
         }
@@ -77,6 +122,49 @@ class MainlineDailyViewModel @Inject constructor(
                 loadBranches(mainlineList.id)
             } else {
                 _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    // ── 记录自动触发（进入应用时自动触发调用）──
+    
+    fun recordAutoTrigger() {
+        viewModelScope.launch {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
+            
+            // 获取当前配置
+            appPrefs.mainlineConfig.collect { config ->
+                val newConfig = config.copy(autoTriggerDate = today)
+                appPrefs.setMainlineConfig(newConfig)
+                
+                AppLogger.d("MainlineDaily: 记录自动触发，日期=$today")
+                
+                // 更新状态为已自动触发
+                _uiState.update { it.copy(shouldAutoTrigger = false) }
+            }
+        }
+    }
+
+    // ── 记录选择完成（手动触发时调用）──
+    
+    fun recordSelectionComplete() {
+        viewModelScope.launch {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
+            val isEvening = _uiState.value.isEveningSession
+            
+            // 获取当前配置
+            appPrefs.mainlineConfig.collect { config ->
+                val newConfig = if (isEvening) {
+                    config.copy(lastEveningDate = today)
+                } else {
+                    config.copy(lastMorningDate = today)
+                }
+                appPrefs.setMainlineConfig(newConfig)
+                
+                AppLogger.d("MainlineDaily: 记录选择完成，时段=${if (isEvening) "晚间" else "早间"}，日期=$today")
+                
+                // 更新状态为已触发
+                _uiState.update { it.copy(hasTriggeredToday = true) }
             }
         }
     }
@@ -101,7 +189,7 @@ class MainlineDailyViewModel @Inject constructor(
     }
 
     // ── 链路选择记录 ──
-    // path JSON格式：[{id, name, type}] 其中type为"current"/"signpost"/"ideal"/"goal"
+    // path JSON格式：[{id, name}] 与 MainlineViewModel 保持一致
 
     fun selectLink(
         currentItem: MainlineItem,
@@ -112,6 +200,8 @@ class MainlineDailyViewModel @Inject constructor(
         timestamp: Long,
     ) {
         viewModelScope.launch {
+            AppLogger.i("MainlineDailyViewModel: selectLink 开始保存数据")
+            
             val gson = com.google.gson.Gson()
             val pathNodes = mutableListOf<Map<String, Any>>()
 
@@ -119,14 +209,12 @@ class MainlineDailyViewModel @Inject constructor(
             pathNodes.add(mapOf(
                 "id" to currentItem.id,
                 "name" to currentItem.name,
-                "type" to "current",
             ))
 
             // 现状关联路标
             pathNodes.add(mapOf(
                 "id" to currentBranch.id,
                 "name" to currentBranch.name,
-                "type" to "signpost",
             ))
 
             // 理想路标（如果与现状路标不同）
@@ -134,7 +222,6 @@ class MainlineDailyViewModel @Inject constructor(
                 pathNodes.add(mapOf(
                     "id" to idealBranch.id,
                     "name" to idealBranch.name,
-                    "type" to "ideal",
                 ))
             }
 
@@ -142,17 +229,23 @@ class MainlineDailyViewModel @Inject constructor(
             pathNodes.add(mapOf(
                 "id" to mainList.id,
                 "name" to mainList.name,
-                "type" to "goal",
             ))
 
             val pathJson = gson.toJson(pathNodes)
-            mainlineRepo.insertRecord(
-                com.fuke.daily.data.model.LinkRecord(
-                    path = pathJson,
-                    date = date,
-                    timestamp = timestamp,
-                )
+            AppLogger.i("MainlineDailyViewModel: selectLink pathJson=$pathJson")
+            
+            val record = com.fuke.daily.data.model.LinkRecord(
+                path = pathJson,
+                date = date,
+                timestamp = timestamp,
             )
+            AppLogger.i("MainlineDailyViewModel: selectLink 准备插入数据库 record=$record")
+            
+            mainlineRepo.insertRecord(record)
+            AppLogger.i("MainlineDailyViewModel: selectLink 数据已保存到数据库")
+            
+            // 记录选择完成
+            recordSelectionComplete()
         }
     }
 }

@@ -829,13 +829,59 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
     private fun onIconDoubleClick() {
         if (_isIconFlashing.value) {
-            // 如果图标在闪烁（闹钟响起），双击停止闹钟
-            AppLogger.i("FloatingWindowService: icon double-clicked while flashing, stopping alarm")
-            stopAlarmSound()
+            // 如果图标在闪烁（闹钟响起），先检查是否有关联的人生主线任务
+            AppLogger.i("FloatingWindowService: icon double-clicked while flashing, checking for pending mainline task")
+            serviceScope.launch {
+                try {
+                    // 检查TimerReminderService是否有待处理的人生主线任务
+                    val pendingTaskId = TimerReminderService.getPendingMainlineTaskId()
+                    if (pendingTaskId > 0) {
+                        AppLogger.i("FloatingWindowService: 有待处理的人生主线任务: taskId=$pendingTaskId")
+                        // 停止闹钟
+                        TimerReminderService.stopEffectOnly(this@FloatingWindowService)
+                        _isIconFlashing.value = false
+                        // 清除待处理任务
+                        TimerReminderService.clearPendingMainlineTask()
+                        // 打开人生主线页面
+                        val intent = Intent(this@FloatingWindowService, com.fuke.daily.MainActivity::class.java).apply {
+                            action = "com.fuke.daily.OPEN_MAINLINE"
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        startActivity(intent)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("FloatingWindowService: 检查待处理任务失败: ${e.message}")
+                }
+                // 没有待处理任务，停止闹钟并显示弹窗
+                stopAlarmSound()
+            }
         } else {
-            // 正常双击，显示弹窗
-            AppLogger.i("FloatingWindowService: icon double-clicked, showing popup")
-            showPopup()
+            // 正常双击，检查是否有待处理的人生主线任务
+            AppLogger.i("FloatingWindowService: icon double-clicked, checking for pending mainline task")
+            serviceScope.launch {
+                try {
+                    // 检查TimerReminderService是否有待处理的人生主线任务
+                    val pendingTaskId = TimerReminderService.getPendingMainlineTaskId()
+                    if (pendingTaskId > 0) {
+                        AppLogger.i("FloatingWindowService: 有待处理的人生主线任务: taskId=$pendingTaskId")
+                        // 清除待处理任务
+                        TimerReminderService.clearPendingMainlineTask()
+                        // 打开人生主线页面
+                        val intent = Intent(this@FloatingWindowService, com.fuke.daily.MainActivity::class.java).apply {
+                            action = "com.fuke.daily.OPEN_MAINLINE"
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        }
+                        startActivity(intent)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("FloatingWindowService: 检查待处理任务失败: ${e.message}")
+                }
+                // 没有待处理任务，正常显示弹窗
+                AppLogger.i("FloatingWindowService: 没有待处理任务，显示弹窗")
+                showPopup()
+            }
         }
     }
 

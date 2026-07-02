@@ -58,6 +58,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.fuke.daily.data.model.MainlineBranch
 import com.fuke.daily.data.model.MainlineItem
 import com.fuke.daily.ui.theme.FukeTheme
+import com.fuke.daily.util.AppLogger
 import com.fuke.daily.viewmodel.MainlineDailyViewModel
 import kotlinx.coroutines.delay
 
@@ -81,6 +82,7 @@ fun MainlineDailyScreen(
     var selectedBranch by remember { mutableStateOf<MainlineBranch?>(null) }
     var selectedCurrentItem by remember { mutableStateOf<MainlineItem?>(null) }
     var selectedIdealBranch by remember { mutableStateOf<MainlineBranch?>(null) }
+    var isCompleted by remember { mutableStateOf(false) }  // 是否已完成选择
 
     // ── 呼吸光晕动画（breathGlow: 3s 循环脉冲）──
     val infiniteTransition = rememberInfiniteTransition(label = "breathGlow")
@@ -137,11 +139,25 @@ fun MainlineDailyScreen(
 
     // ── 确认回调 ──
     fun handleConfirm() {
-        val currentItem = selectedCurrentItem ?: return
-        val cBranch = currentBranch ?: return
-        val mainList = uiState.mainList ?: return
+        val currentItem = selectedCurrentItem ?: run {
+            AppLogger.e("MainlineDailyScreen: handleConfirm 失败，currentItem 为空")
+            return
+        }
+        // 找到现状项所属的路标
+        val cBranch = uiState.branches.find { it.id == currentItem.branchId } ?: run {
+            AppLogger.e("MainlineDailyScreen: handleConfirm 失败，找不到 currentItem 所属的路标")
+            return
+        }
+        val mainList = uiState.mainList ?: run {
+            AppLogger.e("MainlineDailyScreen: handleConfirm 失败，mainList 为空")
+            return
+        }
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
             .format(java.util.Date())
+        
+        AppLogger.i("MainlineDailyScreen: handleConfirm 开始保存数据")
+        AppLogger.i("MainlineDailyScreen: currentItem=${currentItem.name}, cBranch=${cBranch.name}, mainList=${mainList.name}, today=$today")
+        
         viewModel.selectLink(
             currentItem = currentItem,
             currentBranch = cBranch,
@@ -150,6 +166,9 @@ fun MainlineDailyScreen(
             date = today,
             timestamp = System.currentTimeMillis(),
         )
+        // 标记已完成
+        isCompleted = true
+        // 导航到人生主线项目页，由外层清理栈
         onNavigateToMainlineDetail(mainList.id)
     }
 
@@ -348,8 +367,8 @@ fun MainlineDailyScreen(
                             if (!expanded) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = if (uiState.isEveningSession) "回顾今日所行" else "点击查看你的路",
-                                    color = ms.muted,
+                                    text = if (uiState.hasTriggeredToday) "今日已${if (uiState.isEveningSession) "回顾" else "选路"}" else if (uiState.isEveningSession) "回顾今日所行" else "点击查看你的路",
+                                    color = if (uiState.hasTriggeredToday) ms.gold else ms.muted,
                                     fontSize = 13.sp,
                                 )
                             }

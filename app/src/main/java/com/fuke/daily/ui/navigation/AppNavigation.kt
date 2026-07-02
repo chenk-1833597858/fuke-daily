@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,8 +62,19 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
     startDestination: String = Routes.HOME,
+    autoTriggerMainline: Boolean = false,
 ) {
     val context = LocalContext.current
+    
+    // 如果需要自动触发人生主线，导航到人生主线页面
+    LaunchedEffect(Unit) {
+        if (autoTriggerMainline) {
+            com.fuke.daily.util.AppLogger.i("AppNavigation: 自动触发人生主线")
+            navController.navigate(Routes.MAINLINE_DAILY) {
+                popUpTo(Routes.HOME) { inclusive = false }
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -195,9 +207,14 @@ fun AppNavigation(
 
         composable(Routes.MAINLINE_DAILY) {
             MainlineDailyScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { 
+                    // 直接结束人生主线页面，不保留回栈
+                    navController.popBackStack()
+                },
                 onNavigateToMainlineDetail = { listId ->
-                    navController.navigate("mainline/detail/$listId")
+                    navController.navigate("mainline/detail/$listId") {
+                        popUpTo(Routes.MAINLINE_DAILY) { inclusive = true }
+                    }
                 },
             )
         }

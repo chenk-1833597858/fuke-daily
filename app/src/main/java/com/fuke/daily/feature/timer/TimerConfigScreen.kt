@@ -431,8 +431,10 @@ fun TimerConfigScreen(
                     ) {
                         Text(
                             text = if (linkedProjectId > 0) {
-                                val listName = uiState.mainLists.find { it.id == linkedProjectId.toLong() }?.name ?: "未知"
-                                "已关联: $listName"
+                                val list = uiState.mainLists.find { it.id == linkedProjectId.toLong() }
+                                val listName = list?.name ?: "未知"
+                                val typeLabel = list?.type?.let { getListTypeLabel(it) } ?: ""
+                                if (typeLabel.isNotEmpty()) "已关联: $typeLabel . $listName" else "已关联: $listName"
                             } else {
                                 "未关联"
                             },
@@ -471,6 +473,7 @@ fun TimerConfigScreen(
                         // 项目列表
                         uiState.mainLists.forEach { list ->
                             val isSelected = linkedProjectId.toLong() == list.id
+                            val typeLabel = getListTypeLabel(list.type)
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -482,7 +485,7 @@ fun TimerConfigScreen(
                                 color = if (isSelected) extended.primary else extended.light,
                             ) {
                                 Text(
-                                    list.name,
+                                    "$typeLabel . ${list.name}",
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     fontSize = 12.sp,
                                     color = if (isSelected) Color.White else extended.muted,
@@ -1027,4 +1030,15 @@ private fun CheckRow(
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════
+//  辅助函数：获取列表类型中文标签
+// ═══════════════════════════════════════════════════
+
+private fun getListTypeLabel(type: com.fuke.daily.data.model.ListType): String = when (type) {
+    com.fuke.daily.data.model.ListType.SELECTION -> "选择"
+    com.fuke.daily.data.model.ListType.RANDOM -> "随机"
+    com.fuke.daily.data.model.ListType.QUIZ -> "答题"
+    com.fuke.daily.data.model.ListType.MAINLINE -> "人生主线"
 }

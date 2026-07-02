@@ -75,6 +75,12 @@ fun MainlineDetailScreen(
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         viewModel.loadTodayLinks(today)
     }
+    
+    // 每次进入页面都重新加载今日数据
+    LaunchedEffect(Unit) {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        viewModel.loadTodayLinks(today)
+    }
 
     val todayLinks = uiState.todayLinks
     val recentHistory = uiState.linkHistory

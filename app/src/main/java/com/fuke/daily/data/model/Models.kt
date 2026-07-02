@@ -207,4 +207,5 @@ data class MainlineConfig(
     val eveningHour: Int = 21,       // 晚间选择时段
     val lastMorningDate: String = "",  // 上次上午选择日期
     val lastEveningDate: String = "",  // 上次晚间选择日期
+    val autoTriggerDate: String = "",  // 上次自动触发日期（闹钟触发除外）
 )

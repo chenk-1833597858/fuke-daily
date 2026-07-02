@@ -54,6 +54,9 @@ class TimerReminderService : Service() {
     private var ringtone: Ringtone? = null
     private var periodicCheckJob: kotlinx.coroutines.Job? = null
     private var stopAlarmReceiver: android.content.BroadcastReceiver? = null
+    
+    // 待处理的人生主线任务ID（闹钟触发后等待用户双击悬浮图标）
+    private var pendingMainlineTaskId: Long = 0
 
     // 通过Hilt EntryPoint获取TimerRepo
     private val timerRepo: TimerRepo by lazy {
@@ -61,6 +64,14 @@ class TimerReminderService : Service() {
             applicationContext,
             TimerRepoEntryPoint::class.java
         ).timerRepo()
+    }
+    
+    // 通过Hilt EntryPoint获取MainListRepo
+    private val mainListRepo: com.fuke.daily.data.repository.MainListRepo by lazy {
+        EntryPointAccessors.fromApplication(
+            applicationContext,
+            MainListRepoEntryPoint::class.java
+        ).mainListRepo()
     }
 
     override fun onCreate() {
@@ -367,7 +378,7 @@ class TimerReminderService : Service() {
         if (methods.alarm) playAlarm()
         if (methods.vibration) vibrate()
 
-        // 异步更新计数 + 启动悬浮窗
+        // 异步更新计数 + 启动悬浮窗 + 检查关联项目
         serviceScope.launch {
             delay(500)
 
@@ -375,6 +386,19 @@ class TimerReminderService : Service() {
             if (task == null) {
                 AppLogger.w("Timer: 任务不存在: taskId=$taskId")
                 return@launch
+            }
+
+            // 检查是否关联了人生主线
+            if (task.linkedProjectId > 0) {
+                AppLogger.i("Timer: 任务关联了项目: linkedProjectId=${task.linkedProjectId}")
+                // 获取项目类型
+                val mainList = mainListRepo.getListById(task.linkedProjectId)
+                if (mainList?.type == com.fuke.daily.data.model.ListType.MAINLINE) {
+                    AppLogger.i("Timer: 关联项目是人生主线，等待用户双击悬浮图标")
+                    // 不直接打开页面，等待用户双击悬浮图标
+                    // 记录待处理的人生主线任务
+                    TimerReminderService.pendingMainlineTaskId = taskId
+                }
             }
 
             // 次数模式：更新计数
@@ -676,6 +700,12 @@ class TimerReminderService : Service() {
             context.startService(intent)
         }
 
+        // 待处理的人生主线任务ID（静态变量，供FloatingWindowService访问）
+        private var pendingMainlineTaskId: Long = 0
+        
+        fun getPendingMainlineTaskId(): Long = pendingMainlineTaskId
+        fun clearPendingMainlineTask() { pendingMainlineTaskId = 0 }
+
         fun recordAlarmRegistered(context: Context, taskId: Long, expectedTriggerTime: Long) {
             val prefs = context.getSharedPreferences("alarm_registry", Context.MODE_PRIVATE)
             prefs.edit()
@@ -724,4 +754,11 @@ class TimerReminderService : Service() {
 @dagger.hilt.EntryPoint
 interface TimerRepoEntryPoint {
     fun timerRepo(): TimerRepo
+}
+
+// Hilt EntryPoint — 让Service/Receiver获取MainListRepo
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+@dagger.hilt.EntryPoint
+interface MainListRepoEntryPoint {
+    fun mainListRepo(): com.fuke.daily.data.repository.MainListRepo
 }

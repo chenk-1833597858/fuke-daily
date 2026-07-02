@@ -50,10 +50,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.fuke.daily.ui.crop.CropImageDialog
 import com.fuke.daily.ui.theme.FukeTheme
 import com.fuke.daily.util.AppLogger
 import com.fuke.daily.viewmodel.ConfigViewModel
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
 import org.json.JSONArray
 import kotlin.math.roundToInt
 
@@ -106,10 +108,36 @@ fun ImageListScreen(
     // 裁剪状态
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
     var showAspectRatioDialog by remember { mutableStateOf(false) }
-    var showCropDialog by remember { mutableStateOf(false) }
     var cropRatioX by remember { mutableStateOf(1) }
     var cropRatioY by remember { mutableStateOf(1) }
     var cropIsFree by remember { mutableStateOf(false) }
+    
+    // CanHub 裁剪结果接收器
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            val uri = result.uriContent
+            AppLogger.d("Crop result: uri=$uri")
+            uri?.let { cropUri ->
+                try {
+                    // 复制裁剪后的图片到内部存储
+                    context.contentResolver.openInputStream(cropUri)?.use { input ->
+                        val destFile = java.io.File(context.filesDir, "images/${System.currentTimeMillis()}.jpg")
+                        destFile.parentFile?.mkdirs()
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                        AppLogger.d("CropImage: saved to ${destFile.absolutePath}")
+                        viewModel.updateSubListImage(subListId, destFile.absolutePath)
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e("CropImage: save failed", e)
+                }
+            }
+        } else {
+            AppLogger.w("CropImage: crop failed or cancelled")
+        }
+        pendingCropUri = null
+    }
     
     // 图片选择器（选完后显示比例选择对话框）
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -120,36 +148,6 @@ fun ImageListScreen(
             pendingCropUri = it
             showAspectRatioDialog = true
         } ?: AppLogger.w("Picker returned null uri")
-    }
-    
-    // 自定义裁剪对话框
-    if (showCropDialog && pendingCropUri != null) {
-        CropImageDialog(
-            imageUri = pendingCropUri!!,
-            aspectRatioX = cropRatioX,
-            aspectRatioY = cropRatioY,
-            isFreeRatio = cropIsFree,
-            onDismiss = {
-                showCropDialog = false
-                pendingCropUri = null
-            },
-            onCrop = { bitmap ->
-                showCropDialog = false
-                try {
-                    // 保存裁剪后的图片到内部存储
-                    val destFile = java.io.File(context.filesDir, "images/${System.currentTimeMillis()}.jpg")
-                    destFile.parentFile?.mkdirs()
-                    destFile.outputStream().use { output ->
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output)
-                    }
-                    AppLogger.d("CropImageDialog: saved to ${destFile.absolutePath}")
-                    viewModel.updateSubListImage(subListId, destFile.absolutePath)
-                } catch (e: Exception) {
-                    AppLogger.e("CropImageDialog: save failed", e)
-                }
-                pendingCropUri = null
-            }
-        )
     }
     
     // 比例选择对话框
@@ -164,7 +162,28 @@ fun ImageListScreen(
                 cropRatioX = ratioX
                 cropRatioY = ratioY
                 cropIsFree = isFree
-                showCropDialog = true
+                
+                // 启动 CanHub 裁剪
+                val options = CropImageOptions().apply {
+                    if (isFree) {
+                        // 自由模式：不限制比例
+                        fixAspectRatio = false
+                    } else {
+                        // 固定比例
+                        aspectRatioX = ratioX
+                        aspectRatioY = ratioY
+                        fixAspectRatio = true
+                    }
+                    // 裁剪框样式
+                    showCropOverlay = true
+                    showProgressBar = true
+                    // 输出质量
+                    outputCompressQuality = 90
+                }
+                
+                cropLauncher.launch(
+                    CropImageContractOptions(pendingCropUri!!, options)
+                )
             }
         )
     }
