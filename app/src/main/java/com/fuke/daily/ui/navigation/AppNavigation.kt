@@ -237,6 +237,7 @@ fun AppNavigation(
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToLogs = { navController.navigate(Routes.LOGS) },
+                onNavigateToPermission = { navController.navigate(Routes.PERMISSION) },
             )
         }
 

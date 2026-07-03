@@ -125,6 +125,19 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
+    fun updateSubListCarouselInterval(subListId: Long, interval: Long) {
+        viewModelScope.launch {
+            val subList = _uiState.value.subLists.find { it.id == subListId } ?: return@launch
+            val updated = subList.copy(carouselInterval = interval)
+            repo.updateSubList(updated)
+            _uiState.update { state ->
+                state.copy(
+                    subLists = state.subLists.map { if (it.id == subListId) updated else it }
+                )
+            }
+        }
+    }
+
     fun updateSubListImage(subListId: Long, imageUri: String) {
         viewModelScope.launch {
             val subList = _uiState.value.subLists.find { it.id == subListId } ?: return@launch

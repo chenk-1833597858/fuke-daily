@@ -309,14 +309,16 @@ private fun TimerCard(
             // 关联项目
             if (timer.linkedProjectId > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
-                val linkedName = mainLists.find { it.id == timer.linkedProjectId }?.name
-                    ?: "项目#${timer.linkedProjectId}"
+                val linkedList = mainLists.find { it.id == timer.linkedProjectId }
+                val linkedName = linkedList?.name ?: "项目#${timer.linkedProjectId}"
+                val typeLabel = linkedList?.type?.let { getListTypeLabel(it) } ?: ""
+                val displayText = if (typeLabel.isNotEmpty()) "$typeLabel . $linkedName" else linkedName
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = extended.light,
                 ) {
                     Text(
-                        text = "🔗 $linkedName",
+                        text = "🔗 $displayText",
                         fontSize = 11.sp,
                         color = extended.muted,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -343,4 +345,15 @@ private fun TimerCard(
             }
         }
     }
+}
+
+// ═══════════════════════════════════════════════════
+//  辅助函数：获取列表类型中文标签
+// ═══════════════════════════════════════════════════
+
+private fun getListTypeLabel(type: com.fuke.daily.data.model.ListType): String = when (type) {
+    com.fuke.daily.data.model.ListType.SELECTION -> "选择"
+    com.fuke.daily.data.model.ListType.RANDOM -> "随机"
+    com.fuke.daily.data.model.ListType.QUIZ -> "答题"
+    com.fuke.daily.data.model.ListType.MAINLINE -> "人生主线"
 }

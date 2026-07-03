@@ -159,6 +159,16 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    // ── 轮播速度 ──
+
+    val carouselInterval: kotlinx.coroutines.flow.Flow<Long> = appPrefs.carouselInterval
+
+    fun setCarouselInterval(interval: Long) {
+        viewModelScope.launch {
+            appPrefs.setCarouselInterval(interval)
+        }
+    }
+
     // ── 底部导航 ──
 
     fun setBottomTab(index: Int) {

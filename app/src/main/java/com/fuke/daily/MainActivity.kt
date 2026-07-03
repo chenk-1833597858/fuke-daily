@@ -56,8 +56,22 @@ class MainActivity : ComponentActivity() {
                 val config = runBlocking { appPrefs.mainlineConfig.first() }
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
                 val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                val isEvening = currentHour >= config.eveningHour
-                val isMorning = currentHour < config.eveningHour
+                val morningStartHour = config.morningHour  // 早间开始时间（默认6点）
+                val eveningStartHour = config.eveningHour    // 晚间开始时间（默认21点）
+                
+                // 时段判断逻辑：
+                // 早间时段：从早间开始时间 到 晚间开始时间（如 6:00 ~ 21:00）
+                // 晚间时段：从晚间开始时间 到 次日早间开始时间（如 21:00 ~ 次日6:00）
+                // 如果没有设置早间开始时间（morningStartHour=0），只设置了晚间开始时间：默认属于早间时段
+                val (isEvening, isMorning) = if (morningStartHour == 0) {
+                    // 未设置早间开始时间，默认属于早间时段
+                    false to true
+                } else {
+                    // 已设置早间开始时间
+                    val evening = currentHour >= eveningStartHour || currentHour < morningStartHour
+                    val morning = currentHour >= morningStartHour && currentHour < eveningStartHour
+                    evening to morning
+                }
                 
                 // 判断今天是否已经手动触发过
                 val hasTriggeredToday = when {
@@ -66,19 +80,27 @@ class MainActivity : ComponentActivity() {
                     else -> false
                 }
                 
-                // 判断今天是否已经自动触发过
-                val hasAutoTriggeredToday = config.autoTriggerDate == today
+                // 判断今天是否已经自动触发过（按时段分别检查）
+                val hasAutoTriggeredToday = when {
+                    isEvening -> config.autoTriggerEveningDate == today
+                    isMorning -> config.autoTriggerMorningDate == today
+                    else -> false
+                }
                 
-                // 如果需要自动触发（今天还没自动触发过，也没手动触发过）
+                // 如果需要自动触发（今天该时段还没自动触发过，也没手动触发过）
                 autoTriggerMainline = !hasAutoTriggeredToday && !hasTriggeredToday
                 
-                AppLogger.i("MainActivity: 自动触发检查: today=$today, hasTriggeredToday=$hasTriggeredToday, hasAutoTriggeredToday=$hasAutoTriggeredToday, autoTriggerMainline=$autoTriggerMainline")
+                AppLogger.i("MainActivity: 自动触发检查: today=$today, currentHour=$currentHour, isEvening=$isEvening, isMorning=$isMorning, hasTriggeredToday=$hasTriggeredToday, hasAutoTriggeredToday=$hasAutoTriggeredToday, autoTriggerMainline=$autoTriggerMainline")
                 
                 if (autoTriggerMainline) {
-                    // 记录自动触发
-                    val newConfig = config.copy(autoTriggerDate = today)
+                    // 记录自动触发（按时段分别记录）
+                    val newConfig = when {
+                        isEvening -> config.copy(autoTriggerEveningDate = today)
+                        isMorning -> config.copy(autoTriggerMorningDate = today)
+                        else -> config
+                    }
                     runBlocking { appPrefs.setMainlineConfig(newConfig) }
-                    AppLogger.i("MainActivity: 记录自动触发日期: $today")
+                    AppLogger.i("MainActivity: 记录自动触发日期: $today (时段: ${if (isEvening) "晚间" else "早间"})")
                 }
             } catch (e: Exception) {
                 AppLogger.e("MainActivity: 自动触发检查失败: ${e.message}")

@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToLogs: () -> Unit,
+    onNavigateToPermission: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
@@ -90,13 +91,64 @@ fun SettingsScreen(
                 icon = Icons.Filled.Security,
                 title = "权限获取",
                 subtitle = "管理应用所需权限",
-                onClick = {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                    }
-                    context.startActivity(intent)
-                },
+                onClick = onNavigateToPermission,
             )
+            
+            // ── 轮播速度 ──
+            val carouselInterval by viewModel.carouselInterval.collectAsState(initial = 3000L)
+            var showCarouselDialog by remember { mutableStateOf(false) }
+            
+            SettingItem(
+                icon = Icons.Filled.Timer,
+                title = "轮播速度",
+                subtitle = "${carouselInterval}毫秒",
+                onClick = { showCarouselDialog = true },
+            )
+            
+            if (showCarouselDialog) {
+                var inputValue by remember { mutableStateOf(carouselInterval.toString()) }
+                
+                AlertDialog(
+                    onDismissRequest = { showCarouselDialog = false },
+                    title = { Text("设置轮播速度") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = inputValue,
+                                onValueChange = { inputValue = it.filter { c -> c.isDigit() } },
+                                label = { Text("轮播间隔（毫秒）") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                ),
+                                singleLine = true,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "输入范围：500 ~ 10000毫秒",
+                                fontSize = 12.sp,
+                                color = androidx.compose.ui.graphics.Color.Gray,
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val interval = inputValue.toLongOrNull() ?: 3000L
+                                val clamped = interval.coerceIn(500L, 10000L)
+                                viewModel.setCarouselInterval(clamped)
+                                showCarouselDialog = false
+                            },
+                        ) {
+                            Text("确定")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showCarouselDialog = false }) {
+                            Text("取消")
+                        }
+                    },
+                )
+            }
             
             // ── 日志 ──
             SettingItem(

@@ -23,12 +23,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -233,6 +236,84 @@ fun ImageListScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp),
         ) {
+            // 轮播速度设置
+            val carouselInterval = subList?.carouselInterval ?: 0L
+            val effectiveInterval = if (carouselInterval > 0) carouselInterval else 3000L
+            var showCarouselDialog by remember { mutableStateOf(false) }
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .clickable { showCarouselDialog = true },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "轮播速度",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = extended.text,
+                    )
+                    Text(
+                        text = if (carouselInterval > 0) "${effectiveInterval}毫秒（局部）" else "${effectiveInterval}毫秒（全局）",
+                        fontSize = 13.sp,
+                        color = extended.muted,
+                    )
+                }
+                Text(
+                    text = "设置",
+                    fontSize = 14.sp,
+                    color = extended.accent,
+                )
+            }
+            
+            if (showCarouselDialog) {
+                var inputValue by remember { mutableStateOf(if (carouselInterval > 0) carouselInterval.toString() else "") }
+                
+                AlertDialog(
+                    onDismissRequest = { showCarouselDialog = false },
+                    title = { Text("设置轮播速度") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = inputValue,
+                                onValueChange = { inputValue = it.filter { c -> c.isDigit() } },
+                                label = { Text("轮播间隔（毫秒）") },
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                ),
+                                singleLine = true,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "输入范围：500 ~ 10000毫秒，为空时使用全局设置",
+                                fontSize = 12.sp,
+                                color = androidx.compose.ui.graphics.Color.Gray,
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val interval = inputValue.toLongOrNull() ?: 0L
+                                val clamped = if (interval > 0) interval.coerceIn(500L, 10000L) else 0L
+                                viewModel.updateSubListCarouselInterval(subListId, clamped)
+                                showCarouselDialog = false
+                            },
+                        ) {
+                            Text("确定")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showCarouselDialog = false }) {
+                            Text("取消")
+                        }
+                    },
+                )
+            }
+            
             // 图片列表
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
