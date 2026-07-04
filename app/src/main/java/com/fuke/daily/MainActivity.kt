@@ -24,15 +24,18 @@ import com.fuke.daily.util.AppLogger
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var appPrefs: AppPrefs
+    
+    // 缓存权限检查结果，避免重复查询
+    private var cachedOverlayPermission: Boolean? = null
+    private var cachedNotificationPermission: Boolean? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,73 +46,61 @@ class MainActivity : ComponentActivity() {
         val openMainline = intent.action == "com.fuke.daily.OPEN_MAINLINE"
         
         // Fix: 键盘弹起时调整布局，避免遮挡输入框
-        // 不使用 enableEdgeToEdge()，避免与 adjustResize 冲突
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
-        val hasOverlay = Settings.canDrawOverlays(this)
+        val hasOverlay = checkOverlayPermission()
         
-        // 检查是否需要自动触发人生主线（同步获取配置）
+        // 异步检查是否需要自动触发主线选择
+        // 如果当前在触发时段内且今天未触发，则导航到主线页面
         var autoTriggerMainline = false
-        
-        if (hasOverlay && !openMainline) {
-            try {
-                val config = runBlocking { appPrefs.mainlineConfig.first() }
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
-                val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                val morningStartHour = config.morningHour  // 早间开始时间（默认6点）
-                val eveningStartHour = config.eveningHour    // 晚间开始时间（默认21点）
-                
-                // 时段判断逻辑：
-                // 早间时段：从早间开始时间 到 晚间开始时间（如 6:00 ~ 21:00）
-                // 晚间时段：从晚间开始时间 到 次日早间开始时间（如 21:00 ~ 次日6:00）
-                // 如果没有设置早间开始时间（morningStartHour=0），只设置了晚间开始时间：默认属于早间时段
-                val (isEvening, isMorning) = if (morningStartHour == 0) {
-                    // 未设置早间开始时间，默认属于早间时段
-                    false to true
-                } else {
-                    // 已设置早间开始时间
-                    val evening = currentHour >= eveningStartHour || currentHour < morningStartHour
-                    val morning = currentHour >= morningStartHour && currentHour < eveningStartHour
-                    evening to morning
-                }
-                
-                // 判断今天是否已经手动触发过
-                val hasTriggeredToday = when {
-                    isEvening -> config.lastEveningDate == today
-                    isMorning -> config.lastMorningDate == today
-                    else -> false
-                }
-                
-                // 判断今天是否已经自动触发过（按时段分别检查）
-                val hasAutoTriggeredToday = when {
-                    isEvening -> config.autoTriggerEveningDate == today
-                    isMorning -> config.autoTriggerMorningDate == today
-                    else -> false
-                }
-                
-                // 如果需要自动触发（今天该时段还没自动触发过，也没手动触发过）
-                autoTriggerMainline = !hasAutoTriggeredToday && !hasTriggeredToday
-                
-                AppLogger.i("MainActivity: 自动触发检查: today=$today, currentHour=$currentHour, isEvening=$isEvening, isMorning=$isMorning, hasTriggeredToday=$hasTriggeredToday, hasAutoTriggeredToday=$hasAutoTriggeredToday, autoTriggerMainline=$autoTriggerMainline")
-                
-                if (autoTriggerMainline) {
-                    // 记录自动触发（按时段分别记录）
-                    val newConfig = when {
-                        isEvening -> config.copy(autoTriggerEveningDate = today)
-                        isMorning -> config.copy(autoTriggerMorningDate = today)
-                        else -> config
+        try {
+            val config = runBlocking { appPrefs.mainlineConfig.first() }
+            val morningHour = config.morningHour
+            val eveningStartHour = config.eveningHour
+            
+            val now = java.util.Calendar.getInstance()
+            val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+            
+            // 判断当前时段
+            val isMorning = hour in morningHour until eveningStartHour
+            val isEvening = !isMorning
+            
+            // 获取今天的日期字符串
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            val today = sdf.format(now.time)
+            
+            // 检查是否需要触发
+            val shouldTrigger = when {
+                isMorning -> config.lastMorningDate != today
+                isEvening -> {
+                    // 晚间时段跨越两天，需要特殊处理
+                    // 如果当前是凌晨（0:00~morningHour），检查昨晚是否已触发
+                    // 如果当前是晚上（eveningStartHour~23:59），检查今天是否已触发
+                    val isEarlyMorning = hour < morningHour
+                    if (isEarlyMorning) {
+                        // 凌晨时段：检查昨晚（昨天）是否已触发
+                        val yesterdayCalendar = now.clone() as java.util.Calendar
+                        yesterdayCalendar.add(java.util.Calendar.DATE, -1)
+                        val yesterday = sdf.format(yesterdayCalendar.time)
+                        config.lastEveningDate != yesterday && config.lastEveningDate != today
+                    } else {
+                        // 晚上时段：检查今天是否已触发
+                        config.lastEveningDate != today
                     }
-                    runBlocking { appPrefs.setMainlineConfig(newConfig) }
-                    AppLogger.i("MainActivity: 记录自动触发日期: $today (时段: ${if (isEvening) "晚间" else "早间"})")
                 }
-            } catch (e: Exception) {
-                AppLogger.e("MainActivity: 自动触发检查失败: ${e.message}")
+                else -> false
             }
+            
+            autoTriggerMainline = shouldTrigger
+            AppLogger.i("MainActivity: autoTrigger check: isMorning=$isMorning, isEvening=$isEvening, shouldTrigger=$shouldTrigger")
+        } catch (e: Exception) {
+            AppLogger.e("MainActivity: Failed to check auto trigger", e)
         }
         
         val startRoute = when {
             !hasOverlay -> "permission"
             openMainline -> "mainline/daily"
+            autoTriggerMainline -> "mainline/daily"
             else -> "home"
         }
 
@@ -132,34 +123,57 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Fix 3: onResume时检查overlay权限并启动悬浮窗服务
-    override fun onResume() {
-        super.onResume()
-        try {
-            // 同时检查悬浮窗权限和通知权限（Android 14+ 需要通知权限才能启动前台服务）
-            val hasOverlay = Settings.canDrawOverlays(this)
-            val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+    // 检查悬浮窗权限（带缓存）
+    private fun checkOverlayPermission(): Boolean {
+        if (cachedOverlayPermission == null) {
+            cachedOverlayPermission = Settings.canDrawOverlays(this)
+        }
+        return cachedOverlayPermission ?: false
+    }
+    
+    // 检查通知权限（带缓存）
+    private fun checkNotificationPermission(): Boolean {
+        if (cachedNotificationPermission == null) {
+            cachedNotificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
                     android.content.pm.PackageManager.PERMISSION_GRANTED
             } else true
+        }
+        return cachedNotificationPermission ?: true
+    }
 
-            if (hasOverlay && hasNotification) {
-                AppLogger.i("MainActivity: starting FloatingWindowService")
-                val intent = Intent(this, FloatingWindowService::class.java)
-                startForegroundService(intent)
-            } else {
-                AppLogger.w("MainActivity: missing permission, overlay=$hasOverlay, notification=$hasNotification")
-            }
-        } catch (e: Exception) {
-            AppLogger.e("MainActivity: Failed to start FloatingWindowService", e)
-        }
+    // Fix 3: onResume时检查overlay权限并启动悬浮窗服务
+    override fun onResume() {
+        super.onResume()
         
-        // 启动定时服务（如果已创建定时任务）
-        try {
-            AppLogger.i("MainActivity: starting TimerReminderService")
-            TimerReminderService.start(this)
-        } catch (e: Exception) {
-            AppLogger.e("MainActivity: Failed to start TimerReminderService", e)
-        }
+        // 清除权限缓存，下次重新检查
+        cachedOverlayPermission = null
+        cachedNotificationPermission = null
+        
+        // 异步启动服务，避免阻塞主线程
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                val hasOverlay = checkOverlayPermission()
+                val hasNotification = checkNotificationPermission()
+
+                if (hasOverlay && hasNotification) {
+                    AppLogger.i("MainActivity: starting FloatingWindowService")
+                    val intent = Intent(this, FloatingWindowService::class.java)
+                    startForegroundService(intent)
+                } else {
+                    AppLogger.w("MainActivity: missing permission, overlay=$hasOverlay, notification=$hasNotification")
+                }
+            } catch (e: Exception) {
+                AppLogger.e("MainActivity: Failed to start FloatingWindowService", e)
+            }
+            
+            // 启动定时服务（如果已创建定时任务）
+            try {
+                AppLogger.i("MainActivity: starting TimerReminderService")
+                TimerReminderService.start(this)
+            } catch (e: Exception) {
+                AppLogger.e("MainActivity: Failed to start TimerReminderService", e)
+            }
+        }, 500) // 延迟 500ms 启动，让页面先显示
     }
 }

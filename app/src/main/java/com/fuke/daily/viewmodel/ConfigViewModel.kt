@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fuke.daily.data.model.*
 import com.fuke.daily.data.repository.MainListRepo
+import com.fuke.daily.data.datastore.AppPrefs
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -30,10 +31,15 @@ data class ConfigUiState(
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
     private val repo: MainListRepo,
+    private val appPrefs: AppPrefs,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
+
+    // 全局轮播速度
+    val globalCarouselInterval: StateFlow<Long> = appPrefs.carouselInterval
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 3000L)
 
     private var currentListId: Long = 0
     private var hasAutoCreatedRichText = false

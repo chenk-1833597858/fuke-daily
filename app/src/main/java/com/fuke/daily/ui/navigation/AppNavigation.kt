@@ -66,9 +66,9 @@ fun AppNavigation(
 ) {
     val context = LocalContext.current
     
-    // 如果需要自动触发人生主线，导航到人生主线页面
-    LaunchedEffect(Unit) {
-        if (autoTriggerMainline) {
+    // 如果需要自动触发人生主线，且当前不是从主线页面开始，则导航到人生主线页面
+    LaunchedEffect(autoTriggerMainline, startDestination) {
+        if (autoTriggerMainline && startDestination != Routes.MAINLINE_DAILY) {
             com.fuke.daily.util.AppLogger.i("AppNavigation: 自动触发人生主线")
             navController.navigate(Routes.MAINLINE_DAILY) {
                 popUpTo(Routes.HOME) { inclusive = false }
@@ -208,8 +208,12 @@ fun AppNavigation(
         composable(Routes.MAINLINE_DAILY) {
             MainlineDailyScreen(
                 onBack = { 
-                    // 直接结束人生主线页面，不保留回栈
-                    navController.popBackStack()
+                    // 回退到上一页，如果没有则回到首页
+                    if (!navController.popBackStack()) {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 },
                 onNavigateToMainlineDetail = { listId ->
                     navController.navigate("mainline/detail/$listId") {

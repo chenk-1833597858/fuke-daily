@@ -95,18 +95,19 @@ fun SettingsScreen(
             )
             
             // ── 轮播速度 ──
-            val carouselInterval by viewModel.carouselInterval.collectAsState(initial = 3000L)
+            val carouselInterval by viewModel.carouselInterval.collectAsState(initial = 0L)
+            val displayInterval = if (carouselInterval > 0) carouselInterval else 3000L
             var showCarouselDialog by remember { mutableStateOf(false) }
             
             SettingItem(
                 icon = Icons.Filled.Timer,
                 title = "轮播速度",
-                subtitle = "${carouselInterval}毫秒",
+                subtitle = "${displayInterval}毫秒",
                 onClick = { showCarouselDialog = true },
             )
             
             if (showCarouselDialog) {
-                var inputValue by remember { mutableStateOf(carouselInterval.toString()) }
+                var inputValue by remember { mutableStateOf(if (carouselInterval > 0) carouselInterval.toString() else "3000") }
                 
                 AlertDialog(
                     onDismissRequest = { showCarouselDialog = false },

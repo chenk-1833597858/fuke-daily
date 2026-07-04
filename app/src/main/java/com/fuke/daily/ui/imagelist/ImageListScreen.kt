@@ -238,7 +238,8 @@ fun ImageListScreen(
         ) {
             // 轮播速度设置
             val carouselInterval = subList?.carouselInterval ?: 0L
-            val effectiveInterval = if (carouselInterval > 0) carouselInterval else 3000L
+            val globalInterval by viewModel.globalCarouselInterval.collectAsState()
+            val effectiveInterval = if (carouselInterval > 0) carouselInterval else globalInterval
             var showCarouselDialog by remember { mutableStateOf(false) }
             
             Row(

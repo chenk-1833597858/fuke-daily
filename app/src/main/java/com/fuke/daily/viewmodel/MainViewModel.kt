@@ -36,8 +36,11 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    // 缓存的列表数据，避免每次重组重新计算
+    private val _cachedLists = MutableStateFlow<List<MainList>>(emptyList())
+
     init {
-        // 监听主列表
+        // 监听主列表（后台线程查询，不阻塞UI）
         viewModelScope.launch {
             mainListRepo.getAllLists().collect { lists ->
                 val sorted = lists.sortedWith(
@@ -46,6 +49,7 @@ class MainViewModel @Inject constructor(
                         .thenByDescending { if (it.pinned) it.updatedAt else 0L }
                         .thenByDescending { if (it.type != ListType.MAINLINE && !it.pinned) it.createdAt else 0L }
                 )
+                _cachedLists.value = sorted
                 _uiState.update { state ->
                     state.copy(
                         lists = sorted,
@@ -69,13 +73,10 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(currentFilter = filter) }
     }
 
+    // ── 筛选（使用缓存，避免重复计算）──
+
     fun getFilteredLists(): List<MainList> {
-        val state = _uiState.value
-        return if (state.currentFilter == "ALL") {
-            state.lists
-        } else {
-            state.lists.filter { it.type.name == state.currentFilter }
-        }
+        return _cachedLists.value
     }
 
     // ── 开关 ──

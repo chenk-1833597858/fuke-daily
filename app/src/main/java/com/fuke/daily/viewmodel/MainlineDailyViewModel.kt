@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -81,23 +82,35 @@ class MainlineDailyViewModel @Inject constructor(
                     evening to morning
                 }
                 
-                // 获取今天的日期
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
-                
+                // 获取"今天"的日期（以早间开始时间作为一天的分界点）
+                val calendar = Calendar.getInstance()
+                val today = if (currentHour < morningStartHour) {
+                    // 凌晨未到早间时间，算前一天
+                    calendar.add(Calendar.DAY_OF_MONTH, -1)
+                    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
+                } else {
+                    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
+                }
+
                 // 判断今天是否已经手动触发过
+                // 晚间：lastEveningDate 是今天或更晚（跨天情况）才算已触发；否则算过期，需要重新触发
                 val hasTriggeredToday = when {
-                    isEvening -> config.lastEveningDate == today
+                    isEvening -> {
+                        // 晚间时段：检查 lastEveningDate 是否是今天或之后的日期
+                        // 如果 lastEveningDate < today，说明是以前的标记，已过期
+                        config.lastEveningDate >= today
+                    }
                     isMorning -> config.lastMorningDate == today
                     else -> false
                 }
-                
+
                 // 判断今天是否已经自动触发过（按时段分别检查）
                 val hasAutoTriggeredToday = when {
                     isEvening -> config.autoTriggerEveningDate == today
                     isMorning -> config.autoTriggerMorningDate == today
                     else -> false
                 }
-                
+
                 // 判断是否应该自动触发（今天该时段还没有自动触发过，也没手动触发过）
                 val shouldAutoTrigger = !hasAutoTriggeredToday && !hasTriggeredToday
                 
@@ -143,20 +156,19 @@ class MainlineDailyViewModel @Inject constructor(
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
             val isEvening = _uiState.value.isEveningSession
             
-            // 获取当前配置
-            appPrefs.mainlineConfig.collect { config ->
-                val newConfig = if (isEvening) {
-                    config.copy(autoTriggerEveningDate = today)
-                } else {
-                    config.copy(autoTriggerMorningDate = today)
-                }
-                appPrefs.setMainlineConfig(newConfig)
-                
-                AppLogger.d("MainlineDaily: 记录自动触发，日期=$today, 时段=${if (isEvening) "晚间" else "早间"}")
-                
-                // 更新状态为已自动触发
-                _uiState.update { it.copy(shouldAutoTrigger = false) }
+            // 获取当前配置（只取一次）
+            val config = appPrefs.mainlineConfig.first()
+            val newConfig = if (isEvening) {
+                config.copy(autoTriggerEveningDate = today)
+            } else {
+                config.copy(autoTriggerMorningDate = today)
             }
+            appPrefs.setMainlineConfig(newConfig)
+            
+            AppLogger.d("MainlineDaily: 记录自动触发，日期=$today, 时段=${if (isEvening) "晚间" else "早间"}")
+            
+            // 更新状态为已自动触发
+            _uiState.update { it.copy(shouldAutoTrigger = false) }
         }
     }
 
@@ -164,15 +176,35 @@ class MainlineDailyViewModel @Inject constructor(
     
     fun recordSelectionComplete() {
         viewModelScope.launch {
-            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Calendar.getInstance().time)
+            // 获取配置以计算正确的日期
+            val config = appPrefs.mainlineConfig.first()
+            val morningStartHour = config.morningHour
+            
+            val now = Calendar.getInstance()
+            val currentHour = now.get(Calendar.HOUR_OF_DAY)
+            
+            // 计算"今天"的日期（以早间开始时间作为一天的分界点）
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val today = if (currentHour < morningStartHour) {
+                // 凌晨未到早间时间，算前一天
+                now.add(Calendar.DAY_OF_MONTH, -1)
+                sdf.format(now.time)
+            } else {
+                sdf.format(now.time)
+            }
+            
             val isEvening = _uiState.value.isEveningSession
             
             // 获取当前配置
-            appPrefs.mainlineConfig.collect { config ->
+            appPrefs.mainlineConfig.collect { currentConfig ->
                 val newConfig = if (isEvening) {
-                    config.copy(lastEveningDate = today)
+                    currentConfig.copy(lastEveningDate = today)
                 } else {
-                    config.copy(lastMorningDate = today)
+                    // 早间触发时，清除前一天的晚间标记
+                    currentConfig.copy(
+                        lastMorningDate = today,
+                        lastEveningDate = ""  // 清除前一天的晚间标记
+                    )
                 }
                 appPrefs.setMainlineConfig(newConfig)
                 

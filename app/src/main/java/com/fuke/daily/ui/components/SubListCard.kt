@@ -33,8 +33,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import com.fuke.daily.data.model.ContentConfig
 import com.fuke.daily.data.model.OptionButton
 import com.fuke.daily.data.model.SubList
@@ -172,10 +174,23 @@ fun SubListCard(
                 ) {
                     if (firstImageUri != null) {
                         coil.compose.AsyncImage(
-                            model = firstImageUri,
+                            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                .data(firstImageUri)
+                                .crossfade(true)
+                                .build(),
                             contentDescription = "子列表图片",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            placeholder = rememberAsyncImagePainter(
+                                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                    .data(android.R.drawable.ic_menu_gallery)
+                                    .build()
+                            ),
+                            error = rememberAsyncImagePainter(
+                                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                    .data(android.R.drawable.ic_menu_gallery)
+                                    .build()
+                            ),
                         )
                     } else {
                         Box(contentAlignment = Alignment.Center) {

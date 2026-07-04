@@ -33,7 +33,7 @@ import javax.inject.Singleton
         LinkRecord::class,
         TimerItem::class,
     ],
-    version = 6,
+    version = DATABASE_VERSION,
     exportSchema = false,
 )
 @TypeConverters(ListTypeConverters::class, TimerTypeConverters::class)
@@ -101,6 +101,16 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 添加轮播速度字段到 sub_lists 表（如果不存在）
+        MigrationUtils.addColumnIfNotExists(
+            db, "sub_lists", "carouselInterval",
+            "INTEGER NOT NULL", "0"
+        )
+    }
+}
+
 // ═══════════════════════════════════════════════════
 //  Hilt 模块 — 提供 Database 和 DAO 实例
 // ═══════════════════════════════════════════════════
@@ -117,7 +127,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "fuke-daily-db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .fallbackToDestructiveMigration()
             .build()
     }

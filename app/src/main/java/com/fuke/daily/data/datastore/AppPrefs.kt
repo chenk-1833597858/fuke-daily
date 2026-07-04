@@ -120,7 +120,7 @@ class AppPrefs @Inject constructor(
 
     val carouselInterval: Flow<Long> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[Keys.CAROUSEL_INTERVAL] ?: 1000L }
+        .map { prefs -> prefs[Keys.CAROUSEL_INTERVAL] ?: 3000L }
 
     suspend fun setCarouselInterval(interval: Long) {
         dataStore.edit { it[Keys.CAROUSEL_INTERVAL] = interval }

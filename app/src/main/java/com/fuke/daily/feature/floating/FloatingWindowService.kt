@@ -104,6 +104,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     private val _currentImageUris = MutableStateFlow<List<String>>(emptyList())
     private val _currentImageIndex = MutableStateFlow(0)
     private val _currentCarouselInterval = MutableStateFlow(3000L)  // 轮播间隔（毫秒），默认3000ms
+    private val _globalCarouselInterval = MutableStateFlow(3000L)     // 全局轮播间隔（毫秒），默认3000ms
     private val _themeMode = MutableStateFlow(ThemeMode.WARM)
     private val _currentListType = MutableStateFlow(ListType.SELECTION)
     private val _currentQuizCards = MutableStateFlow<List<QuizCard>>(emptyList())
@@ -136,6 +137,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
             createNotificationChannel()
             startForegroundNotification()
             loadThemeMode()
+            loadGlobalCarouselInterval()
             AppLogger.i("FloatingWindowService: created")
         } catch (e: Throwable) {
             AppLogger.e("FloatingWindowService: onCreate failed", e)
@@ -217,6 +219,17 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
             try {
                 appPrefs.themeMode.collect { mode ->
                     _themeMode.value = mode
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun loadGlobalCarouselInterval() {
+        serviceScope.launch {
+            try {
+                appPrefs.carouselInterval.collect { interval ->
+                    _globalCarouselInterval.value = interval
+                    AppLogger.d("FloatingWindowService: 全局轮播间隔更新为 ${interval}ms")
                 }
             } catch (_: Exception) {}
         }
@@ -459,16 +472,25 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     private fun startCarousel() {
         carouselJob?.cancel()
         carouselJob = serviceScope.launch {
+            // 先显示第一张图片（立即执行，不等待）
+            val imageUris = _currentImageUris.value
+            if (imageUris.isNotEmpty()) {
+                _currentImageIndex.value = 0
+                _currentImageUri.value = imageUris[0]
+                AppLogger.d("Carousel: 显示第一张图片 0/${imageUris.size}")
+            }
+            // 如果只有一张图片，不需要轮播
+            if (imageUris.size <= 1) return@launch
+            // 循环轮播：从第二张开始
             while (isActive) {
-                // 获取轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
                 val interval = _currentCarouselInterval.value
                 delay(interval)
-                val imageUris = _currentImageUris.value
-                if (imageUris.size > 1) {
-                    val nextIndex = (_currentImageIndex.value + 1) % imageUris.size
+                val currentUris = _currentImageUris.value
+                if (currentUris.size > 1) {
+                    val nextIndex = (_currentImageIndex.value + 1) % currentUris.size
                     _currentImageIndex.value = nextIndex
-                    _currentImageUri.value = imageUris[nextIndex]
-                    AppLogger.d("Carousel: switched to image $nextIndex/${imageUris.size}, interval=${interval}ms")
+                    _currentImageUri.value = currentUris[nextIndex]
+                    AppLogger.d("Carousel: switched to image $nextIndex/${currentUris.size}, interval=${interval}ms")
                 }
             }
         }
@@ -570,7 +592,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
                     _currentImageEnabled.value = subList.imageEnabled
                     // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
-                    _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else 3000L
+                    _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
                 }
             } catch (e: Exception) {
                 AppLogger.e("FloatingWindowService: loadNextItem failed", e)
@@ -638,7 +660,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
                     _currentImageEnabled.value = subList.imageEnabled
                     // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
-                    _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else 3000L
+                    _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
                 }
             } catch (e: Exception) {
                 AppLogger.e("FloatingWindowService: loadFirstItem failed", e)
@@ -768,7 +790,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                             _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
                             _currentImageEnabled.value = subList.imageEnabled
                             // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
-                            _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else 3000L
+                            _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
                         }
                     } catch (e: Exception) {
                         AppLogger.e("FloatingWindowService: jumpToSubList failed", e)

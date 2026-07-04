@@ -733,15 +733,25 @@ class TimerReminderService : Service() {
             val repo = entryPoint.timerRepo()
             val task = repo.getTimerById(taskId) ?: return
 
-            when (task.reminderSubType) {
-                ReminderSubType.LOOP -> {
-                    scheduleTask(context, task)
+            when (task.type) {
+                TimerType.ALARM -> {
+                    // 闹钟类型：根据重复模式重新调度
+                    if (task.repeatMode != RepeatMode.NONE) {
+                        scheduleTask(context, task)
+                    }
                 }
-                ReminderSubType.COUNT -> {
-                    val newCount = task.reminderCurrentCount + 1
-                    repo.updateTimer(task.copy(reminderCurrentCount = newCount))
-                    if (newCount < task.count) {
-                        scheduleTask(context, task.copy(reminderCurrentCount = newCount))
+                TimerType.REMINDER -> {
+                    when (task.reminderSubType) {
+                        ReminderSubType.LOOP -> {
+                            scheduleTask(context, task)
+                        }
+                        ReminderSubType.COUNT -> {
+                            val newCount = task.reminderCurrentCount + 1
+                            repo.updateTimer(task.copy(reminderCurrentCount = newCount))
+                            if (newCount < task.count) {
+                                scheduleTask(context, task.copy(reminderCurrentCount = newCount))
+                            }
+                        }
                     }
                 }
             }
