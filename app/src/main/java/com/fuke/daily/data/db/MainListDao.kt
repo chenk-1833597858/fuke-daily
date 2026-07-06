@@ -22,7 +22,7 @@ interface MainListDao {
     @Query("SELECT * FROM main_lists WHERE id = :id")
     suspend fun getListById(id: Long): MainList?
 
-    @Query("SELECT * FROM main_lists WHERE type = 'MAINLINE' LIMIT 1")
+    @Query("SELECT * FROM main_lists WHERE type = 'MAINLINE' AND isEnabled = 1 LIMIT 1")
     suspend fun getMainlineList(): MainList?
 
     @Insert

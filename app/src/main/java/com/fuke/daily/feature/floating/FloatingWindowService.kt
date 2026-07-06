@@ -16,6 +16,9 @@ import android.view.View
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -113,6 +116,14 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     // ── 轮播 ──
     private var carouselJob: kotlinx.coroutines.Job? = null
 
+    // ── 全屏轮播 ──
+    private var carouselComposeView: View? = null
+    private var carouselParams: WindowManager.LayoutParams? = null
+    private val _isCarouselVisible = MutableStateFlow(false)
+
+    // ── 图片悬浮窗 ──
+    private var imageFloatingWindowManager: ImageFloatingWindowManager? = null
+
     // ── 拖动 + 双击 ──
     private var isDragging = false
     private var dragStartX = 0
@@ -181,6 +192,24 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                 ACTION_STOP_ALARM -> {
                     AppLogger.i("FloatingWindowService: ACTION_STOP_ALARM")
                     stopAlarmSound()
+                }
+                ACTION_HIDE_ALL -> {
+                    AppLogger.i("FloatingWindowService: ACTION_HIDE_ALL")
+                    hidePopup()
+                    hideIcon()
+                }
+                ACTION_OPEN_IMAGE_CAROUSEL -> {
+                    AppLogger.i("FloatingWindowService: ACTION_OPEN_IMAGE_CAROUSEL")
+                    val imageUris = intent.getStringArrayExtra("imageUris")?.toList() ?: emptyList()
+                    val imageIndex = intent.getIntExtra("imageIndex", 0)
+                    AppLogger.d("FloatingWindowService: ACTION_OPEN_IMAGE_CAROUSEL imageUris.size=${imageUris.size}, imageIndex=$imageIndex")
+                    if (imageUris.isNotEmpty()) {
+                        _currentImageUris.value = imageUris
+                        _currentImageIndex.value = imageIndex
+                        showImageCarousel(imageIndex)
+                    } else {
+                        AppLogger.w("FloatingWindowService: ACTION_OPEN_IMAGE_CAROUSEL imageUris is empty, ignoring")
+                    }
                 }
                 else -> {
                     AppLogger.i("FloatingWindowService: unknown action=${intent?.action}, showing icon")
@@ -461,9 +490,11 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
             floatingWindowManager.showPopup(popupComposeView!!, popupParams!!)
             _isPopupVisible.value = true
             // 双击打开：加载第一个启用项目的第一个子列表
-            loadFirstItem()
-            // 启动轮播
-            startCarousel()
+            // 加载完成后再启动轮播
+            serviceScope.launch {
+                loadFirstItemSuspend()
+                startCarousel()
+            }
         } catch (e: Exception) {
             AppLogger.e("FloatingWindowService: showPopup failed", e)
         }
@@ -471,29 +502,45 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
     private fun startCarousel() {
         carouselJob?.cancel()
+        AppLogger.d("Carousel: starting carousel, job cancelled")
         carouselJob = serviceScope.launch {
             // 先显示第一张图片（立即执行，不等待）
             val imageUris = _currentImageUris.value
+            AppLogger.d("Carousel: imageUris.size=${imageUris.size}, isActive=$isActive")
             if (imageUris.isNotEmpty()) {
                 _currentImageIndex.value = 0
                 _currentImageUri.value = imageUris[0]
                 AppLogger.d("Carousel: 显示第一张图片 0/${imageUris.size}")
+            } else {
+                AppLogger.w("Carousel: imageUris is empty, stopping")
+                return@launch
             }
             // 如果只有一张图片，不需要轮播
-            if (imageUris.size <= 1) return@launch
+            if (imageUris.size <= 1) {
+                AppLogger.d("Carousel: only 1 image, no carousel needed")
+                return@launch
+            }
             // 循环轮播：从第二张开始
+            AppLogger.d("Carousel: starting loop with interval=${_currentCarouselInterval.value}ms")
             while (isActive) {
                 val interval = _currentCarouselInterval.value
+                AppLogger.d("Carousel: delaying ${interval}ms")
                 delay(interval)
                 val currentUris = _currentImageUris.value
+                AppLogger.d("Carousel: after delay, currentUris.size=${currentUris.size}, isActive=$isActive")
                 if (currentUris.size > 1) {
                     val nextIndex = (_currentImageIndex.value + 1) % currentUris.size
                     _currentImageIndex.value = nextIndex
                     _currentImageUri.value = currentUris[nextIndex]
                     AppLogger.d("Carousel: switched to image $nextIndex/${currentUris.size}, interval=${interval}ms")
+                } else {
+                    AppLogger.w("Carousel: currentUris.size <= 1, breaking loop")
+                    break
                 }
             }
+            AppLogger.d("Carousel: loop ended, isActive=$isActive")
         }
+        AppLogger.d("Carousel: job started")
     }
 
     private fun stopAlarmSound() {
@@ -533,6 +580,60 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         } else {
             showPopup()
         }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  全屏图片轮播
+    // ═══════════════════════════════════════════════════
+
+    private fun showImageCarousel(initialIndex: Int = 0) {
+        if (imageFloatingWindowManager?.isShowing() == true) return
+        if (!android.provider.Settings.canDrawOverlays(this)) return
+
+        AppLogger.d("FloatingWindowService: showImageCarousel called, initialIndex=$initialIndex")
+
+        try {
+            // 隐藏悬浮弹窗（不恢复图标）
+            try {
+                floatingWindowManager.hidePopup()
+            } catch (e: Exception) {
+                AppLogger.e("FloatingWindowService: hidePopup failed", e)
+            }
+            _isPopupVisible.value = false
+            popupComposeView = null
+            popupParams = null
+
+            // 停止轮播
+            carouselJob?.cancel()
+            carouselJob = null
+
+            // 隐藏悬浮图标
+            hideIcon()
+
+            AppLogger.d("FloatingWindowService: popup and icon hidden")
+
+            // 创建图片悬浮窗
+            imageFloatingWindowManager = ImageFloatingWindowManager(this, windowManager).apply {
+                show(
+                    imageUris = _currentImageUris.value,
+                    initialIndex = initialIndex,
+                    carouselInterval = _currentCarouselInterval.value,
+                    onClose = {
+                        // 显示原悬浮窗弹窗
+                        showPopup()
+                    },
+                )
+            }
+
+            AppLogger.d("FloatingWindowService: ImageFloatingWindow shown successfully")
+        } catch (e: Exception) {
+            AppLogger.e("FloatingWindowService: showImageCarousel failed", e)
+        }
+    }
+
+    private fun hideImageCarousel() {
+        imageFloatingWindowManager?.hide()
+        imageFloatingWindowManager = null
     }
 
     // ═══════════════════════════════════════════════════
@@ -594,6 +695,8 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
                     _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
                 }
+                // 加载完成后重新启动轮播
+                startCarousel()
             } catch (e: Exception) {
                 AppLogger.e("FloatingWindowService: loadNextItem failed", e)
             }
@@ -604,67 +707,65 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
      * 双击打开时：加载第一个启用项目的第一个子列表
      * 每次双击都重新查库，实时反映开关/删除变化
      */
-    private fun loadFirstItem() {
-        serviceScope.launch {
-            try {
-                // 重置洗牌池并加载第一个启用项目的第一个子列表
-                val result = floatingWindowManager.loadFirstEnabledItem()
-                if (result == null) {
-                    AppLogger.w("FloatingWindowService: no enabled items")
-                    _currentContent.value = AnnotatedString("")
-                    _currentButtons.value = emptyList()
-                    _currentQuizCards.value = emptyList()
-                    return@launch
-                }
-
-                val (mainList, subList) = result
-
-                if (mainList.type == ListType.QUIZ) {
-                    // QUIZ类型：加载答题卡片
-                    val cards = floatingWindowManager.loadQuizCards(mainList.id)
-                    _currentListType.value = ListType.QUIZ
-                    _currentQuizCards.value = cards
-                    _currentContent.value = AnnotatedString("")
-                    _currentButtons.value = emptyList()
-                    _currentImageUri.value = null
-                    _currentImageEnabled.value = true
-                } else {
-                    // 非QUIZ类型：走原有逻辑
-                    _currentListType.value = mainList.type
-                    _currentQuizCards.value = emptyList()
-
-                    val (config, buttons, storageData) = floatingWindowManager.loadStorageAndRichText(mainList, subList)
-
-                    val content = buildContentText(
-                        subList = subList,
-                        config = config ?: ContentConfig(subListId = subList.id, parentListId = mainList.id),
-                        storageData = storageData,
-                        fixedSlotData = floatingWindowManager.getCurrentFixedSlotData(),
-                    )
-
-                    _currentContent.value = content
-                    _currentButtons.value = buttons
-                    // 从 imageUris 解析图片列表
-                    val imageUris = try {
-                        val array = org.json.JSONArray(subList.imageUris)
-                        val list = mutableListOf<String>()
-                        for (i in 0 until array.length()) {
-                            list.add(array.getString(i))
-                        }
-                        list
-                    } catch (_: Exception) {
-                        emptyList<String>()
-                    }
-                    _currentImageUris.value = imageUris
-                    _currentImageIndex.value = 0
-                    _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
-                    _currentImageEnabled.value = subList.imageEnabled
-                    // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
-                    _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
-                }
-            } catch (e: Exception) {
-                AppLogger.e("FloatingWindowService: loadFirstItem failed", e)
+    private suspend fun loadFirstItemSuspend() {
+        try {
+            // 重置洗牌池并加载第一个启用项目的第一个子列表
+            val result = floatingWindowManager.loadFirstEnabledItem()
+            if (result == null) {
+                AppLogger.w("FloatingWindowService: no enabled items")
+                _currentContent.value = AnnotatedString("")
+                _currentButtons.value = emptyList()
+                _currentQuizCards.value = emptyList()
+                return
             }
+
+            val (mainList, subList) = result
+
+            if (mainList.type == ListType.QUIZ) {
+                // QUIZ类型：加载答题卡片
+                val cards = floatingWindowManager.loadQuizCards(mainList.id)
+                _currentListType.value = ListType.QUIZ
+                _currentQuizCards.value = cards
+                _currentContent.value = AnnotatedString("")
+                _currentButtons.value = emptyList()
+                _currentImageUri.value = null
+                _currentImageEnabled.value = true
+            } else {
+                // 非QUIZ类型：走原有逻辑
+                _currentListType.value = mainList.type
+                _currentQuizCards.value = emptyList()
+
+                val (config, buttons, storageData) = floatingWindowManager.loadStorageAndRichText(mainList, subList)
+
+                val content = buildContentText(
+                    subList = subList,
+                    config = config ?: ContentConfig(subListId = subList.id, parentListId = mainList.id),
+                    storageData = storageData,
+                    fixedSlotData = floatingWindowManager.getCurrentFixedSlotData(),
+                )
+
+                _currentContent.value = content
+                _currentButtons.value = buttons
+                // 从 imageUris 解析图片列表
+                val imageUris = try {
+                    val array = org.json.JSONArray(subList.imageUris)
+                    val list = mutableListOf<String>()
+                    for (i in 0 until array.length()) {
+                        list.add(array.getString(i))
+                    }
+                    list
+                } catch (_: Exception) {
+                    emptyList<String>()
+                }
+                _currentImageUris.value = imageUris
+                _currentImageIndex.value = 0
+                _currentImageUri.value = imageUris.firstOrNull() ?: subList.imageUri
+                _currentImageEnabled.value = subList.imageEnabled
+                // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
+                _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
+            }
+        } catch (e: Exception) {
+            AppLogger.e("FloatingWindowService: loadFirstItem failed", e)
         }
     }
 
@@ -791,6 +892,8 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                             _currentImageEnabled.value = subList.imageEnabled
                             // 设置轮播速度：优先使用 SubList 局部设置，为0时使用全局设置
                             _currentCarouselInterval.value = if (subList.carouselInterval > 0) subList.carouselInterval else _globalCarouselInterval.value
+                            // 跳转后重新启动轮播
+                            startCarousel()
                         }
                     } catch (e: Exception) {
                         AppLogger.e("FloatingWindowService: jumpToSubList failed", e)
@@ -928,6 +1031,8 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
         const val ACTION_START_FLASHING = "com.fuke.daily.START_FLASHING"
         const val ACTION_STOP_FLASHING = "com.fuke.daily.STOP_FLASHING"
         const val ACTION_STOP_ALARM = "com.fuke.daily.STOP_ALARM"
+        const val ACTION_OPEN_IMAGE_CAROUSEL = "com.fuke.daily.OPEN_IMAGE_CAROUSEL"
+        const val ACTION_HIDE_ALL = "com.fuke.daily.HIDE_ALL"
 
         fun start(context: android.content.Context) {
             val intent = Intent(context, FloatingWindowService::class.java).apply {

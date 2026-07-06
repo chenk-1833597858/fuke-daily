@@ -147,6 +147,16 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    // ── 修改名称 ──
+
+    fun updateListName(id: Long, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val list = mainListRepo.getListById(id) ?: return@launch
+            mainListRepo.updateList(list.copy(name = name, updatedAt = System.currentTimeMillis()))
+        }
+    }
+
     // ── 主题切换 ──
 
     fun switchTheme() {

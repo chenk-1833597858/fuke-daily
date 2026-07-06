@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fuke.daily.data.datastore.AppPrefs
+import com.fuke.daily.data.repository.MainListRepo
 import com.fuke.daily.feature.floating.FloatingWindowService
 import com.fuke.daily.feature.timer.TimerReminderService
 import com.fuke.daily.ui.navigation.AppNavigation
@@ -32,6 +33,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var appPrefs: AppPrefs
+    @Inject lateinit var mainListRepo: MainListRepo
     
     // 缓存权限检查结果，避免重复查询
     private var cachedOverlayPermission: Boolean? = null
@@ -54,45 +56,51 @@ class MainActivity : ComponentActivity() {
         // 如果当前在触发时段内且今天未触发，则导航到主线页面
         var autoTriggerMainline = false
         try {
-            val config = runBlocking { appPrefs.mainlineConfig.first() }
-            val morningHour = config.morningHour
-            val eveningStartHour = config.eveningHour
-            
-            val now = java.util.Calendar.getInstance()
-            val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
-            
-            // 判断当前时段
-            val isMorning = hour in morningHour until eveningStartHour
-            val isEvening = !isMorning
-            
-            // 获取今天的日期字符串
-            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-            val today = sdf.format(now.time)
-            
-            // 检查是否需要触发
-            val shouldTrigger = when {
-                isMorning -> config.lastMorningDate != today
-                isEvening -> {
-                    // 晚间时段跨越两天，需要特殊处理
-                    // 如果当前是凌晨（0:00~morningHour），检查昨晚是否已触发
-                    // 如果当前是晚上（eveningStartHour~23:59），检查今天是否已触发
-                    val isEarlyMorning = hour < morningHour
-                    if (isEarlyMorning) {
-                        // 凌晨时段：检查昨晚（昨天）是否已触发
-                        val yesterdayCalendar = now.clone() as java.util.Calendar
-                        yesterdayCalendar.add(java.util.Calendar.DATE, -1)
-                        val yesterday = sdf.format(yesterdayCalendar.time)
-                        config.lastEveningDate != yesterday && config.lastEveningDate != today
-                    } else {
-                        // 晚上时段：检查今天是否已触发
-                        config.lastEveningDate != today
+            // 先检查是否有启用的 MAINLINE 项目
+            val mainlineList = runBlocking { mainListRepo.getMainlineList() }
+            if (mainlineList == null) {
+                AppLogger.i("MainActivity: 没有启用的 MAINLINE 项目，跳过自动触发")
+            } else {
+                val config = runBlocking { appPrefs.mainlineConfig.first() }
+                val morningHour = config.morningHour
+                val eveningStartHour = config.eveningHour
+                
+                val now = java.util.Calendar.getInstance()
+                val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
+                
+                // 判断当前时段
+                val isMorning = hour in morningHour until eveningStartHour
+                val isEvening = !isMorning
+                
+                // 获取今天的日期字符串
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val today = sdf.format(now.time)
+                
+                // 检查是否需要触发
+                val shouldTrigger = when {
+                    isMorning -> config.lastMorningDate != today
+                    isEvening -> {
+                        // 晚间时段跨越两天，需要特殊处理
+                        // 如果当前是凌晨（0:00~morningHour），检查昨晚是否已触发
+                        // 如果当前是晚上（eveningStartHour~23:59），检查今天是否已触发
+                        val isEarlyMorning = hour < morningHour
+                        if (isEarlyMorning) {
+                            // 凌晨时段：检查昨晚（昨天）是否已触发
+                            val yesterdayCalendar = now.clone() as java.util.Calendar
+                            yesterdayCalendar.add(java.util.Calendar.DATE, -1)
+                            val yesterday = sdf.format(yesterdayCalendar.time)
+                            config.lastEveningDate != yesterday && config.lastEveningDate != today
+                        } else {
+                            // 晚上时段：检查今天是否已触发
+                            config.lastEveningDate != today
+                        }
                     }
+                    else -> false
                 }
-                else -> false
+                
+                autoTriggerMainline = shouldTrigger
+                AppLogger.i("MainActivity: autoTrigger check: isMorning=$isMorning, isEvening=$isEvening, shouldTrigger=$shouldTrigger, mainlineList=${mainlineList.name}")
             }
-            
-            autoTriggerMainline = shouldTrigger
-            AppLogger.i("MainActivity: autoTrigger check: isMorning=$isMorning, isEvening=$isEvening, shouldTrigger=$shouldTrigger")
         } catch (e: Exception) {
             AppLogger.e("MainActivity: Failed to check auto trigger", e)
         }

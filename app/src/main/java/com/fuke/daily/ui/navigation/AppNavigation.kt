@@ -175,6 +175,12 @@ fun AppNavigation(
                 listId = listId,
                 onBack = { navController.popBackStack() },
                 onNavigateToEdit = { navController.navigate("mainline/edit/$listId") },
+                onDelete = {
+                    // 删除后返回首页
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
             )
         }
 
@@ -217,7 +223,8 @@ fun AppNavigation(
                 },
                 onNavigateToMainlineDetail = { listId ->
                     navController.navigate("mainline/detail/$listId") {
-                        popUpTo(Routes.MAINLINE_DAILY) { inclusive = true }
+                        // 清空整个栈，避免返回时回到主线选择页面
+                        popUpTo(0) { inclusive = true }
                     }
                 },
             )

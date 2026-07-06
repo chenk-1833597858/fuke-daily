@@ -22,16 +22,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,11 +69,13 @@ fun MainlineDetailScreen(
     listId: Long,
     onBack: () -> Unit,
     onNavigateToEdit: () -> Unit,
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: MainlineViewModel = hiltViewModel(),
 ) {
     val ms = FukeTheme.mainlineSelect
     val uiState by viewModel.uiState.collectAsState()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // 初始化
     LaunchedEffect(listId) {
@@ -137,6 +145,39 @@ fun MainlineDetailScreen(
                     tint = ms.gold,
                 )
             }
+            // 删除按钮
+            IconButton(onClick = { showDeleteDialog = true }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "删除",
+                    tint = Color(0xFFE57373),
+                )
+            }
+        }
+
+        // 删除确认对话框
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("确认删除") },
+                text = { Text("确定要删除这个人生主线项目吗？此操作不可撤销。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteDialog = false
+                            viewModel.deleteMainline()
+                            onDelete()
+                        }
+                    ) {
+                        Text("删除", color = Color(0xFFE57373))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
         }
 
         // ── 内容区（可滚动）──

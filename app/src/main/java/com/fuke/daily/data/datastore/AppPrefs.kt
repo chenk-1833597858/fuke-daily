@@ -45,6 +45,7 @@ class AppPrefs @Inject constructor(
         val ICON_POS_Y = intPreferencesKey("icon_pos_y")
         val CAROUSEL_INTERVAL = longPreferencesKey("carousel_interval")
         val CAROUSEL_ANIMATION = stringPreferencesKey("carousel_animation")
+        val CAROUSEL_ENABLED = booleanPreferencesKey("carousel_enabled")
     }
 
     // ── 主题模式 ──
@@ -132,5 +133,15 @@ class AppPrefs @Inject constructor(
 
     suspend fun setCarouselAnimation(animation: String) {
         dataStore.edit { it[Keys.CAROUSEL_ANIMATION] = animation }
+    }
+
+    // ── 轮播开关 ──
+
+    val carouselEnabled: Flow<Boolean> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> prefs[Keys.CAROUSEL_ENABLED] ?: true }
+
+    suspend fun setCarouselEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.CAROUSEL_ENABLED] = enabled }
     }
 }

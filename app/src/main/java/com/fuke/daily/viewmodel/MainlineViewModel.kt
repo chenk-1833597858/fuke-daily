@@ -315,6 +315,18 @@ class MainlineViewModel @Inject constructor(
         }
     }
 
+    // ── 删除主线项目 ──
+    
+    fun deleteMainline() {
+        viewModelScope.launch {
+            val listId = currentListId
+            if (listId > 0) {
+                mainListRepo.deleteListCascade(listId)
+                AppLogger.i("MainlineViewModel: 删除主线项目 id=$listId")
+            }
+        }
+    }
+
     // ── JSON 序列化/反序列化 ──
 
     private fun serializePath(path: List<Pair<Long, String>>): String {

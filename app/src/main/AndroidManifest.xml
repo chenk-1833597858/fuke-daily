@@ -71,6 +71,12 @@
             android:name="com.canhub.cropper.CropImageActivity"
             android:theme="@style/Base.Theme.AppCompat" />
 
+        <!-- Image Carousel Activity -->
+        <activity
+            android:name=".ui.imagecarousel.ImageCarouselActivity"
+            android:theme="@style/Theme.FukeDaily"
+            android:exported="false" />
+
     </application>
 
 </manifest>

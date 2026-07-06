@@ -236,6 +236,9 @@ fun HomeScreen(
 
     // ── 长按操作弹窗 ──
     val actionItem = uiState.actionListItem
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
+    
     if (uiState.showItemActionDialog && actionItem != null) {
         ItemActionDialog(
             item = actionItem,
@@ -247,7 +250,43 @@ fun HomeScreen(
                 viewModel.deleteList(actionItem.id)
                 viewModel.dismissItemActionDialog()
             },
+            onRename = {
+                renameText = actionItem.name
+                showRenameDialog = true
+                viewModel.dismissItemActionDialog()
+            },
             onDismiss = { viewModel.dismissItemActionDialog() },
+        )
+    }
+    
+    // ── 重命名对话框 ──
+    if (showRenameDialog && actionItem != null) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("修改名称") },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("项目名称") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.updateListName(actionItem.id, renameText)
+                        showRenameDialog = false
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("取消")
+                }
+            }
         )
     }
 
@@ -296,6 +335,7 @@ private fun ItemActionDialog(
     item: MainList,
     onPin: () -> Unit,
     onDelete: () -> Unit,
+    onRename: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val extended = FukeTheme.extended
@@ -322,6 +362,25 @@ private fun ItemActionDialog(
                 ) {
                     Text(
                         text = if (item.pinned) "📌 $pinLabel" else "📌 $pinLabel",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        fontSize = 15.sp,
+                        color = extended.primary,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 修改名称按钮
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onRename),
+                    shape = RoundedCornerShape(8.dp),
+                    color = extended.light,
+                ) {
+                    Text(
+                        text = "✏️ 修改名称",
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                         fontSize = 15.sp,
                         color = extended.primary,

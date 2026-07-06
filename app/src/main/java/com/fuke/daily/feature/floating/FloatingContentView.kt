@@ -132,23 +132,6 @@ fun FloatingPopup(
             )
         }
 
-        // 图片在弹窗上方显示（独立于弹窗动画）
-        if (validImageUri != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(2f)
-                    .padding(top = 48.dp), // 顶部留出更多空间
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                FloatingImage(
-                    imageUri = validImageUri,
-                    imageUris = imageUris,
-                    imageIndex = imageIndex,
-                )
-            }
-        }
-
         // 底部弹窗内容
         AnimatedVisibility(
             visible = isVisible,
@@ -176,6 +159,22 @@ fun FloatingPopup(
                         .heightIn(min = halfScreenHeight, max = screenHeight * 0.9f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    // 图片显示在弹窗内部顶部
+                    if (validImageUri != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FloatingImage(
+                                imageUri = validImageUri,
+                                imageUris = imageUris,
+                                imageIndex = imageIndex,
+                            )
+                        }
+                    }
+                    
                     BottomSheetContent(
                         content = content,
                         buttons = buttons,
@@ -303,10 +302,20 @@ private fun FloatingImage(
                 shape = RoundedCornerShape(16.dp),
                 clip = false
             )
-            .pointerInput(Unit) {
-                // 拦截点击事件，防止穿透到遮罩层
-                // 使用 detectTapGestures 来消费所有点击事件
-                detectTapGestures { }
+            .clickable {
+                // 点击图片进入全屏轮播
+                if (imageUris.isNotEmpty()) {
+                    android.util.Log.d("FloatingImage", "点击图片，发送广播显示全屏轮播，imageUris.size=${imageUris.size}, imageIndex=$imageIndex")
+                    // 发送广播给 FloatingWindowService 显示全屏轮播
+                    val intent = android.content.Intent(context, com.fuke.daily.feature.floating.FloatingWindowService::class.java).apply {
+                        action = "com.fuke.daily.OPEN_IMAGE_CAROUSEL"
+                        putExtra("imageUris", imageUris.toTypedArray())
+                        putExtra("imageIndex", imageIndex)
+                    }
+                    context.startService(intent)
+                } else {
+                    android.util.Log.w("FloatingImage", "点击图片时 imageUris 为空，不执行操作")
+                }
             }
     ) {
         // 使用 Crossfade 实现图片切换动画
