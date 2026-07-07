@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,10 +32,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,25 +51,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.DrawModifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.AnnotatedString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalConfiguration
@@ -100,6 +113,7 @@ fun FloatingPopup(
     onContentButtonClick: (Int) -> Unit = {},
     onButtonClick: (OptionButton) -> Unit = {},
     onDismiss: () -> Unit = {},
+    onImageCarouselVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val isQuizMode = listType == ListType.QUIZ && quizCards.isNotEmpty()
     
@@ -115,9 +129,24 @@ fun FloatingPopup(
         if (imageEnabled) imageUri?.takeIf { it.isNotBlank() } else null
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // 遮罩层
-        if (isVisible) {
+    // 是否显示图片轮播
+    var showImageCarousel by remember { mutableStateOf(false) }
+    var carouselIndex by remember { mutableStateOf(0) }
+    
+    // 监听图片轮播状态变化
+    LaunchedEffect(showImageCarousel) {
+        onImageCarouselVisibilityChange(showImageCarousel)
+    }
+
+    Box(
+        modifier = if (showImageCarousel) {
+            modifier  // 不设置 fillMaxSize，让 Box 只包裹内容
+        } else {
+            modifier.fillMaxSize()  // 正常模式下覆盖整个屏幕
+        }
+    ) {
+        // 遮罩层（只在正常模式下显示）
+        if (isVisible && !showImageCarousel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -132,9 +161,20 @@ fun FloatingPopup(
             )
         }
 
-        // 底部弹窗内容
+        // 图片轮播（全屏显示）
+        if (showImageCarousel) {
+            ImageCarouselOverlay(
+                imageUris = imageUris,
+                initialIndex = carouselIndex,
+                onClose = {
+                    showImageCarousel = false
+                },
+            )
+        }
+
+        // 底部弹窗内容（只在正常模式下显示）
         AnimatedVisibility(
-            visible = isVisible,
+            visible = isVisible && !showImageCarousel,
             enter = slideInVertically(
                 initialOffsetY = { it },
                 animationSpec = tween(250),
@@ -171,6 +211,10 @@ fun FloatingPopup(
                                 imageUri = validImageUri,
                                 imageUris = imageUris,
                                 imageIndex = imageIndex,
+                                onImageClick = { clickedIndex ->
+                                    carouselIndex = clickedIndex
+                                    showImageCarousel = true
+                                },
                             )
                         }
                     }
@@ -269,7 +313,8 @@ private fun FloatingImage(
     imageUri: String,
     imageUris: List<String> = emptyList(),
     imageIndex: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onImageClick: ((Int) -> Unit)? = null,
 ) {
     // 获取屏幕尺寸
     val configuration = LocalConfiguration.current
@@ -304,7 +349,9 @@ private fun FloatingImage(
             )
             .clickable {
                 // 点击图片进入全屏轮播
-                if (imageUris.isNotEmpty()) {
+                if (onImageClick != null) {
+                    onImageClick(imageIndex)
+                } else if (imageUris.isNotEmpty()) {
                     android.util.Log.d("FloatingImage", "点击图片，发送广播显示全屏轮播，imageUris.size=${imageUris.size}, imageIndex=$imageIndex")
                     // 发送广播给 FloatingWindowService 显示全屏轮播
                     val intent = android.content.Intent(context, com.fuke.daily.feature.floating.FloatingWindowService::class.java).apply {
@@ -385,8 +432,102 @@ private fun FloatingImage(
 }
 
 // ═══════════════════════════════════════════════════
-//  内容框组件 — 解析[xxx]按钮标记
+//  图片轮播悬浮窗（可拖动的小悬浮窗）
 // ═══════════════════════════════════════════════════
+
+@Composable
+private fun ImageCarouselOverlay(
+    imageUris: List<String>,
+    initialIndex: Int = 0,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    var currentIndex by remember { mutableStateOf(initialIndex) }
+    
+    // 自动轮播
+    LaunchedEffect(currentIndex) {
+        if (imageUris.size > 1) {
+            delay(3000)
+            currentIndex = (currentIndex + 1) % imageUris.size
+        }
+    }
+    
+    // 确保索引在有效范围内
+    val safeIndex = currentIndex.coerceIn(0, imageUris.size - 1)
+    val currentUri = imageUris.getOrNull(safeIndex) ?: return
+    val isInternalPath = currentUri.startsWith(context.filesDir.absolutePath)
+    
+    // 屏幕尺寸（dp）
+    val screenWidthDp = configuration.screenWidthDp.dp
+    val screenHeightDp = configuration.screenHeightDp.dp
+    
+    // 悬浮窗大小（dp）
+    val windowWidthDp = screenWidthDp * 0.8f
+    val windowHeightDp = screenHeightDp * 0.35f
+    
+    Box(
+        modifier = Modifier
+            .width(windowWidthDp)
+            .height(windowHeightDp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.Black.copy(alpha = 0.9f)),
+    ) {
+        // 图片
+        AsyncImage(
+            model = if (isInternalPath) java.io.File(currentUri) else currentUri,
+            contentDescription = "轮播图片",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+        )
+        
+        // 右上角关闭按钮
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)  // 减小内边距
+                .size(32.dp)
+                .background(
+                    Color.Black.copy(alpha = 0.5f),
+                    RoundedCornerShape(16.dp)
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "关闭",
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        
+        // 底部指示器
+        if (imageUris.size > 1) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                imageUris.forEachIndexed { index, _ ->
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(
+                                if (index == safeIndex) Color.White
+                                else Color.White.copy(alpha = 0.5f)
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+                    // ═══════════════════════════════════════════════════
+                    //  内容框组件 — 解析[xxx]按钮标记
+                    // ═══════════════════════════════════════════════════
 
 @Composable
 private fun ContentBox(

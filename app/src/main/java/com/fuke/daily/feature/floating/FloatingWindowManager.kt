@@ -146,6 +146,19 @@ class FloatingWindowManager @Inject constructor(
     fun isPopupVisible(): Boolean = isPopupShowing
 
     // ═══════════════════════════════════════════════════
+    //  位置保存和恢复
+    // ═══════════════════════════════════════════════════
+
+    fun getCurrentMainListIndex(): Int = currentMainListIndex
+    fun getCurrentSubListIndex(): Int = currentSubListIndexInMain
+
+    fun restorePosition(mainListIndex: Int, subListIndex: Int) {
+        currentMainListIndex = mainListIndex
+        currentSubListIndexInMain = subListIndex
+        AppLogger.d("FloatingWindowManager: position restored to mainList=$mainListIndex, subList=$subListIndex")
+    }
+
+    // ═══════════════════════════════════════════════════
     //  洗牌池逻辑 — 项目级别随机，子列表按顺序
     // ═══════════════════════════════════════════════════
 

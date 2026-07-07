@@ -112,6 +112,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     private val _currentListType = MutableStateFlow(ListType.SELECTION)
     private val _currentQuizCards = MutableStateFlow<List<QuizCard>>(emptyList())
     private val _isIconFlashing = MutableStateFlow(false)
+    private val _isImageCarouselVisible = MutableStateFlow(false)  // 图片轮播是否显示
 
     // ── 轮播 ──
     private var carouselJob: kotlinx.coroutines.Job? = null
@@ -120,9 +121,6 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     private var carouselComposeView: View? = null
     private var carouselParams: WindowManager.LayoutParams? = null
     private val _isCarouselVisible = MutableStateFlow(false)
-
-    // ── 图片悬浮窗 ──
-    private var imageFloatingWindowManager: ImageFloatingWindowManager? = null
 
     // ── 拖动 + 双击 ──
     private var isDragging = false
@@ -482,13 +480,52 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                             onDismiss = {
                                 hidePopup()
                             },
+                            onImageCarouselVisibilityChange = { isVisible ->
+                                _isImageCarouselVisible.value = isVisible
+                            },
                         )
                     }
                 }
             }
 
+            // 设置触摸监听（拖动 + 点击X）
+            popupComposeView?.setOnTouchListener(PopupTouchListener())
+
             floatingWindowManager.showPopup(popupComposeView!!, popupParams!!)
             _isPopupVisible.value = true
+            
+            // 监听图片轮播状态，动态调整窗口大小
+            serviceScope.launch {
+                _isImageCarouselVisible.collect { isVisible ->
+                    AppLogger.d("FloatingWindowService: _isImageCarouselVisible changed to $isVisible")
+                    if (popupComposeView != null && popupParams != null) {
+                        if (isVisible) {
+                            // 图片轮播显示时，缩小窗口
+                            val screenWidth = resources.displayMetrics.widthPixels
+                            val screenHeight = resources.displayMetrics.heightPixels
+                            val windowWidth = (screenWidth * 0.8).toInt()
+                            val windowHeight = (screenHeight * 0.35).toInt()
+                            popupParams!!.width = windowWidth
+                            popupParams!!.height = windowHeight
+                            popupParams!!.gravity = Gravity.CENTER
+                            AppLogger.d("FloatingWindowService: updating popup layout to ${windowWidth}x${windowHeight}, gravity=CENTER")
+                            windowManager?.updateViewLayout(popupComposeView, popupParams)
+                            AppLogger.d("FloatingWindowService: popup resized to ${windowWidth}x${windowHeight}")
+                        } else {
+                            // 图片轮播隐藏时，恢复全屏
+                            popupParams!!.width = WindowManager.LayoutParams.MATCH_PARENT
+                            popupParams!!.height = WindowManager.LayoutParams.MATCH_PARENT
+                            popupParams!!.gravity = Gravity.TOP or Gravity.START
+                            AppLogger.d("FloatingWindowService: updating popup layout to MATCH_PARENT, gravity=TOP|START")
+                            windowManager?.updateViewLayout(popupComposeView, popupParams)
+                            AppLogger.d("FloatingWindowService: popup restored to full screen")
+                        }
+                    } else {
+                        AppLogger.w("FloatingWindowService: popupComposeView or popupParams is null")
+                    }
+                }
+            }
+            
             // 双击打开：加载第一个启用项目的第一个子列表
             // 加载完成后再启动轮播
             serviceScope.launch {
@@ -587,53 +624,8 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     // ═══════════════════════════════════════════════════
 
     private fun showImageCarousel(initialIndex: Int = 0) {
-        if (imageFloatingWindowManager?.isShowing() == true) return
-        if (!android.provider.Settings.canDrawOverlays(this)) return
-
-        AppLogger.d("FloatingWindowService: showImageCarousel called, initialIndex=$initialIndex")
-
-        try {
-            // 隐藏悬浮弹窗（不恢复图标）
-            try {
-                floatingWindowManager.hidePopup()
-            } catch (e: Exception) {
-                AppLogger.e("FloatingWindowService: hidePopup failed", e)
-            }
-            _isPopupVisible.value = false
-            popupComposeView = null
-            popupParams = null
-
-            // 停止轮播
-            carouselJob?.cancel()
-            carouselJob = null
-
-            // 隐藏悬浮图标
-            hideIcon()
-
-            AppLogger.d("FloatingWindowService: popup and icon hidden")
-
-            // 创建图片悬浮窗
-            imageFloatingWindowManager = ImageFloatingWindowManager(this, windowManager).apply {
-                show(
-                    imageUris = _currentImageUris.value,
-                    initialIndex = initialIndex,
-                    carouselInterval = _currentCarouselInterval.value,
-                    onClose = {
-                        // 显示原悬浮窗弹窗
-                        showPopup()
-                    },
-                )
-            }
-
-            AppLogger.d("FloatingWindowService: ImageFloatingWindow shown successfully")
-        } catch (e: Exception) {
-            AppLogger.e("FloatingWindowService: showImageCarousel failed", e)
-        }
-    }
-
-    private fun hideImageCarousel() {
-        imageFloatingWindowManager?.hide()
-        imageFloatingWindowManager = null
+        // 图片轮播现在在 FloatingContentView 中处理，不需要在这里创建
+        AppLogger.d("FloatingWindowService: showImageCarousel called, initialIndex=$initialIndex, 现在在 FloatingContentView 中处理")
     }
 
     // ═══════════════════════════════════════════════════
@@ -910,6 +902,148 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
     // ═══════════════════════════════════════════════════
     //  拖动 + 双击检测
     // ═══════════════════════════════════════════════════
+
+    private inner class PopupTouchListener : View.OnTouchListener {
+        private var isDragging = false
+        private var isScaling = false
+        private var dragStartX = 0
+        private var dragStartY = 0
+        private var popupStartX = 0
+        private var popupStartY = 0
+        private var totalDragDistance = 0
+        private val closeButtonSizePx = (48 * resources.displayMetrics.density).toInt()  // 48dp 转像素
+        
+        // 缩放相关
+        private var lastDistance = 0f
+        private var originalWidth = 0
+        private var originalHeight = 0
+        private var scaleCenterX = 0.5f  // 双指中心点相对于窗口的X比例
+        private var scaleCenterY = 0.5f  // 双指中心点相对于窗口的Y比例
+
+        override fun onTouch(v: View, event: android.view.MotionEvent): Boolean {
+            val params = popupParams ?: return false
+
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    isDragging = false
+                    isScaling = false
+                    totalDragDistance = 0
+                    dragStartX = event.rawX.toInt()
+                    dragStartY = event.rawY.toInt()
+                    popupStartX = params.x
+                    popupStartY = params.y
+                    return true
+                }
+
+                android.view.MotionEvent.ACTION_POINTER_DOWN -> {
+                    // 双指按下，开始缩放
+                    if (event.pointerCount == 2) {
+                        isScaling = true
+                        lastDistance = calculateDistance(event)
+                        originalWidth = params.width
+                        originalHeight = params.height
+                        
+                        // 记录双指中心点（相对于窗口的坐标比例）
+                        val pointer1X = event.getX(0)
+                        val pointer1Y = event.getY(0)
+                        val pointer2X = event.getX(1)
+                        val pointer2Y = event.getY(1)
+                        
+                        // 双指中心点相对于窗口左上角的偏移比例
+                        scaleCenterX = ((pointer1X + pointer2X) / 2 / params.width).coerceIn(0f, 1f)
+                        scaleCenterY = ((pointer1Y + pointer2Y) / 2 / params.height).coerceIn(0f, 1f)
+                    }
+                    return true
+                }
+
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (isScaling && event.pointerCount == 2) {
+                        // 计算缩放比例
+                        val currentDistance = calculateDistance(event)
+                        val scale = currentDistance / lastDistance
+                        
+                        // 根据屏幕大小动态计算最大缩放比例
+                        val screenWidth = resources.displayMetrics.widthPixels
+                        val screenHeight = resources.displayMetrics.heightPixels
+                        val maxScaleX = screenWidth.toFloat() / originalWidth
+                        val maxScaleY = screenHeight.toFloat() / originalHeight
+                        val maxScale = kotlin.math.min(maxScaleX, maxScaleY).coerceAtMost(2.0f)
+                        
+                        // 限制缩放范围
+                        val clampedScale = scale.coerceIn(0.5f, maxScale)
+                        
+                        // 计算新的窗口大小
+                        val newWidth = (originalWidth * clampedScale).toInt().coerceAtLeast(1)
+                        val newHeight = (originalHeight * clampedScale).toInt().coerceAtLeast(1)
+                        
+                        // 以双指中心点为基准调整位置
+                        params.x = (params.x + params.width * scaleCenterX - newWidth * scaleCenterX).toInt()
+                        params.y = (params.y + params.height * scaleCenterY - newHeight * scaleCenterY).toInt()
+                        
+                        // 更新窗口大小
+                        params.width = newWidth
+                        params.height = newHeight
+                        
+                        // 限制在屏幕边界内
+                        params.x = params.x.coerceIn(0, screenWidth - newWidth)
+                        params.y = params.y.coerceIn(0, screenHeight - newHeight)
+                        
+                        try {
+                            windowManager?.updateViewLayout(popupComposeView, params)
+                        } catch (e: Exception) {
+                            AppLogger.e("FloatingWindowService: updateViewLayout failed during scale", e)
+                        }
+                        return true
+                    }
+
+                    val dx = event.rawX.toInt() - dragStartX
+                    val dy = event.rawY.toInt() - dragStartY
+                    totalDragDistance += kotlin.math.abs(dx) + kotlin.math.abs(dy)
+
+                    if (totalDragDistance > 10) {
+                        isDragging = true
+                    }
+
+                    if (isDragging) {
+                        params.x = popupStartX + dx
+                        params.y = popupStartY + dy
+                        try {
+                            windowManager?.updateViewLayout(popupComposeView, params)
+                        } catch (_: Exception) {}
+                    }
+                    return true
+                }
+
+                android.view.MotionEvent.ACTION_POINTER_UP -> {
+                    isScaling = false
+                    return true
+                }
+
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (!isDragging && !isScaling) {
+                        // 检查是否点击了X按钮区域（右上角）
+                        val isInCloseButtonArea = event.x > (params.width - closeButtonSizePx) && 
+                                                   event.y < closeButtonSizePx
+                        if (isInCloseButtonArea) {
+                            // 点击X，关闭图片轮播
+                            _isImageCarouselVisible.value = false
+                            return true
+                        }
+                    }
+                    isDragging = false
+                    isScaling = false
+                    return true
+                }
+            }
+            return false
+        }
+        
+        private fun calculateDistance(event: android.view.MotionEvent): Float {
+            val dx = event.getX(0) - event.getX(1)
+            val dy = event.getY(0) - event.getY(1)
+            return kotlin.math.sqrt(dx * dx + dy * dy)
+        }
+    }
 
     private inner class IconTouchListener : View.OnTouchListener {
         override fun onTouch(v: View, event: android.view.MotionEvent): Boolean {
