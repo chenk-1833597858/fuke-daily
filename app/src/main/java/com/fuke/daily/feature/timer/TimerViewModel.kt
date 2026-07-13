@@ -7,6 +7,7 @@ import com.fuke.daily.data.model.*
 import com.fuke.daily.data.repository.MainListRepo
 import com.fuke.daily.data.repository.TimerRepo
 import com.fuke.daily.feature.timer.TimerReminderService
+import com.fuke.daily.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -100,6 +101,53 @@ class TimerViewModel @Inject constructor(
                 } else {
                     TimerReminderService.cancelTask(context, id)
                 }
+            }
+        }
+    }
+
+    /**
+     * 暂停/恢复定时任务
+     * - 前台暂停：isPaused = true，下次到点继续（保留isEnabled）
+     * - 恢复：isPaused = false，重新调度
+     */
+    fun pauseTimer(id: Long, context: Context? = null) {
+        val timer = _uiState.value.timers.find { it.id == id } ?: return
+        val updated = timer.copy(isPaused = true)
+        viewModelScope.launch {
+            timerRepo.updateTimer(updated)
+            // 前台暂停：取消当前调度但保留isEnabled
+            if (context != null) {
+                TimerReminderService.cancelTask(context, id)
+                AppLogger.i("Timer: 任务已前台暂停: taskId=$id, isPaused=true")
+            }
+        }
+    }
+
+    fun resumeTimer(id: Long, context: Context? = null) {
+        val timer = _uiState.value.timers.find { it.id == id } ?: return
+        val updated = timer.copy(isPaused = false)
+        viewModelScope.launch {
+            timerRepo.updateTimer(updated)
+            // 恢复调度
+            if (context != null && updated.isEnabled) {
+                TimerReminderService.scheduleTask(context, updated)
+                AppLogger.i("Timer: 任务已恢复: taskId=$id, isPaused=false")
+            }
+        }
+    }
+
+    /**
+     * 永久关闭定时任务（设置界面关闭）
+     * - isEnabled = false, isPaused = false
+     */
+    fun disableTimer(id: Long, context: Context? = null) {
+        val timer = _uiState.value.timers.find { it.id == id } ?: return
+        val updated = timer.copy(isEnabled = false, isPaused = false)
+        viewModelScope.launch {
+            timerRepo.updateTimer(updated)
+            if (context != null) {
+                TimerReminderService.cancelTask(context, id)
+                AppLogger.i("Timer: 任务已永久关闭: taskId=$id, isEnabled=false, isPaused=false")
             }
         }
     }

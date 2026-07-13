@@ -27,10 +27,16 @@ data class TimerItem(
     val reminderSubType: ReminderSubType = ReminderSubType.LOOP,
     val intervalMinutes: Int = 0,          // 循环间隔（分钟）
     val count: Int = 0,                    // 次数
+    // 随机间隔模式
+    val randomBaseInterval: Int = 1,       // 基础间隔（分钟）
+    val randomMinMultiplier: Int = 1,      // 最小倍数
+    val randomMaxMultiplier: Int = 10,     // 最大倍数
+    val isAllDay: Boolean = true,          // 全时段
     // 提醒方式
     val alarmEnabled: Boolean = true,      // 闹铃
     val vibrationEnabled: Boolean = true,  // 震动
     val floatingWindowEnabled: Boolean = true, // 悬浮窗
+    val alarmDuration: Int = 20,           // 响铃时长（秒）
     // 通用
     val isEnabled: Boolean = true,
     val linkedProjectId: Long = 0,         // 关联项目ID，0=无关联
@@ -40,6 +46,8 @@ data class TimerItem(
     val nextTriggerTime: Long = 0,         // 下次触发时间戳
     val lastTriggerTime: Long = 0,         // 上次触发时间戳
     val reminderCurrentCount: Int = 0,     // 次数模式当前已触发次数
+    // 暂停功能
+    val isPaused: Boolean = false,         // 是否暂停（前台暂停，下次到点继续）
 )
 
 enum class TimerType(val displayName: String) {
@@ -57,6 +65,7 @@ enum class RepeatMode(val displayName: String) {
 enum class ReminderSubType(val displayName: String) {
     LOOP("循环"),
     COUNT("次数"),
+    RANDOM("随机间隔"),
 }
 
 // 提醒方式位掩码

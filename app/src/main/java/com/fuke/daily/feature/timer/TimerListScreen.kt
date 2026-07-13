@@ -283,6 +283,7 @@ private fun TimerCard(
                             text = when (timer.reminderSubType) {
                                 ReminderSubType.LOOP -> "每隔${timer.intervalMinutes}分钟"
                                 ReminderSubType.COUNT -> "${timer.count}次"
+                                ReminderSubType.RANDOM -> "随机间隔(${timer.randomBaseInterval}分钟×${timer.randomMinMultiplier}~${timer.randomMaxMultiplier})"
                             },
                             fontSize = 12.sp,
                             color = extended.muted,

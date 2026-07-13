@@ -225,6 +225,11 @@ class TimerReminderService : Service() {
 
     private fun scheduleTask(task: TimerItem) {
         if (!task.isEnabled) return
+        // 检查是否已暂停
+        if (task.isPaused) {
+            AppLogger.d("Timer: 任务已暂停，跳过调度: taskId=${task.id}")
+            return
+        }
 
         when (task.type) {
             TimerType.ALARM -> scheduleAlarm(task)
@@ -261,10 +266,75 @@ class TimerReminderService : Service() {
         when (task.reminderSubType) {
             ReminderSubType.LOOP -> scheduleLoopReminder(task)
             ReminderSubType.COUNT -> scheduleCountReminder(task)
+            ReminderSubType.RANDOM -> scheduleRandomReminder(task)
         }
     }
 
+    /**
+     * 随机间隔提醒调度
+     * - 每次触发前随机生成倍数（min~max）
+     * - 实际间隔 = 基础间隔 × 随机倍数
+     * - 支持循环模式（无限触发）和次数模式（限定次数）
+     * - 全时段判断逻辑
+     * - 超过12小时检查
+     */
+    private fun scheduleRandomReminder(task: TimerItem) {
+        // 检查是否已暂停
+        if (task.isPaused) {
+            AppLogger.d("Timer: 任务已暂停，跳过调度: taskId=${task.id}")
+            return
+        }
+
+        // 检查次数模式是否已到达上限
+        if (task.reminderSubType == ReminderSubType.RANDOM && task.count > 0 && task.reminderCurrentCount >= task.count) {
+            AppLogger.d("Timer: 随机间隔次数模式已达到上限: ${task.reminderCurrentCount}/${task.count}")
+            return
+        }
+
+        // 全时段判断逻辑
+        if (!task.isAllDay) {
+            if (!isCurrentTimeInRange(task.startHour, task.startMinute, task.endHour, task.endMinute)) {
+                AppLogger.d("Timer: 当前不在时间范围内，跳过随机间隔调度: taskId=${task.id}")
+                return
+            }
+        }
+
+        // 随机生成倍数（min~max）
+        val multiplier = (task.randomMinMultiplier..task.randomMaxMultiplier).random()
+        val actualIntervalMinutes = task.randomBaseInterval * multiplier
+
+        // 超过12小时检查（720分钟）
+        if (actualIntervalMinutes > 720) {
+            AppLogger.w("Timer: 随机间隔超过12小时: ${actualIntervalMinutes}分钟，taskId=${task.id}")
+        }
+
+        AppLogger.i("Timer: 随机间隔调度: taskId=${task.id}, 基础间隔=${task.randomBaseInterval}分钟, 倍数=$multiplier, 实际间隔=${actualIntervalMinutes}分钟")
+
+        val intervalMs = actualIntervalMinutes.toLong() * 60 * 1000
+        val triggerTime = System.currentTimeMillis() + intervalMs
+
+        // 非全时段时，检查是否超过结束时间
+        if (!task.isAllDay) {
+            val endCal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, task.endHour)
+                set(Calendar.MINUTE, task.endMinute)
+                set(Calendar.SECOND, 0)
+            }
+            if (triggerTime > endCal.timeInMillis) {
+                AppLogger.d("Timer: 随机间隔触发时间超过结束时间，跳过: ${formatTime(triggerTime)} > ${formatTime(endCal.timeInMillis)}")
+                return
+            }
+        }
+
+        scheduleAlarmAtTime(task, triggerTime)
+    }
+
     private fun scheduleLoopReminder(task: TimerItem) {
+        // 检查是否已暂停
+        if (task.isPaused) {
+            AppLogger.d("Timer: 任务已暂停，跳过调度: taskId=${task.id}")
+            return
+        }
         if (!isCurrentTimeInRange(task.startHour, task.startMinute, task.endHour, task.endMinute)) return
 
         val intervalMs = task.intervalMinutes.toLong() * 60 * 1000
@@ -282,6 +352,11 @@ class TimerReminderService : Service() {
     }
 
     private fun scheduleCountReminder(task: TimerItem) {
+        // 检查是否已暂停
+        if (task.isPaused) {
+            AppLogger.d("Timer: 任务已暂停，跳过调度: taskId=${task.id}")
+            return
+        }
         if (task.reminderCurrentCount >= task.count) return
         if (!isCurrentTimeInRange(task.startHour, task.startMinute, task.endHour, task.endMinute)) return
 
@@ -386,6 +461,22 @@ class TimerReminderService : Service() {
             if (task == null) {
                 AppLogger.w("Timer: 任务不存在: taskId=$taskId")
                 return@launch
+            }
+
+            // 启动自动关闭定时器（根据用户设置的响铃时长）
+            val durationSeconds = task.alarmDuration.coerceIn(5, 300)
+            AppLogger.i("Timer: 启动自动关闭定时器: ${durationSeconds}秒后自动停止")
+            serviceScope.launch {
+                delay(durationSeconds * 1000L)
+                AppLogger.i("Timer: 响铃时长已到，自动停止提醒")
+                stopEffectOnly()
+                // 停止悬浮窗闪烁
+                try {
+                    FloatingWindowService.stopFlashing(this@TimerReminderService)
+                    AppLogger.i("Timer: 悬浮窗闪烁已停止")
+                } catch (e: Exception) {
+                    AppLogger.e("Timer: 停止悬浮窗闪烁失败: ${e.message}")
+                }
             }
 
             // 检查是否关联了人生主线
@@ -751,6 +842,18 @@ class TimerReminderService : Service() {
                             if (newCount < task.count) {
                                 scheduleTask(context, task.copy(reminderCurrentCount = newCount))
                             }
+                        }
+                        ReminderSubType.RANDOM -> {
+                            // 随机间隔模式：更新计数并调度下一次
+                            val newCount = task.reminderCurrentCount + 1
+                            repo.updateTimer(task.copy(reminderCurrentCount = newCount))
+                            // 次数模式且已达到上限，不再调度
+                            if (task.count > 0 && newCount >= task.count) {
+                                AppLogger.d("Timer: 随机间隔次数模式已达到上限，不再调度: $newCount/${task.count}")
+                                return
+                            }
+                            // 继续调度下一次随机间隔提醒
+                            scheduleTask(context, task.copy(reminderCurrentCount = newCount))
                         }
                     }
                 }

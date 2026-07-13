@@ -89,10 +89,17 @@ fun TimerConfigScreen(
     var intervalMinutes by rememberSaveable { mutableIntStateOf(30) }
     var reminderCount by rememberSaveable { mutableIntStateOf(3) }
 
+    // 随机间隔模式
+    var randomBaseInterval by rememberSaveable { mutableIntStateOf(1) }
+    var randomMinMultiplier by rememberSaveable { mutableIntStateOf(1) }
+    var randomMaxMultiplier by rememberSaveable { mutableIntStateOf(10) }
+    var isAllDay by rememberSaveable { mutableStateOf(true) }
+
     // 提醒方式
     var alarmEnabled by rememberSaveable { mutableStateOf(true) }
     var vibrationEnabled by rememberSaveable { mutableStateOf(true) }
     var floatingWindowEnabled by rememberSaveable { mutableStateOf(true) }
+    var alarmDuration by rememberSaveable { mutableIntStateOf(20) } // 响铃时长（秒）
 
     // 关联项目
     var linkedProjectId by rememberSaveable { mutableIntStateOf(0) }
@@ -116,9 +123,15 @@ fun TimerConfigScreen(
             reminderSubType = t.reminderSubType
             intervalMinutes = t.intervalMinutes
             reminderCount = t.count
+            // 加载随机间隔模式字段
+            randomBaseInterval = t.randomBaseInterval
+            randomMinMultiplier = t.randomMinMultiplier
+            randomMaxMultiplier = t.randomMaxMultiplier
+            isAllDay = t.isAllDay
             alarmEnabled = t.alarmEnabled
             vibrationEnabled = t.vibrationEnabled
             floatingWindowEnabled = t.floatingWindowEnabled
+            alarmDuration = t.alarmDuration
             linkedProjectId = t.linkedProjectId.toInt()
         }
     }
@@ -254,24 +267,57 @@ fun TimerConfigScreen(
                 // 时间范围
                 Section(title = "时间范围") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TimeRow(
-                            label = "开始",
-                            hour = startHour,
-                            minute = startMinute,
-                            onTimeChange = { h, m ->
-                                startHour = h
-                                startMinute = m
-                            },
-                        )
-                        TimeRow(
-                            label = "结束",
-                            hour = endHour,
-                            minute = endMinute,
-                            onTimeChange = { h, m ->
-                                endHour = h
-                                endMinute = m
-                            },
-                        )
+                        // 全时段开关
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isAllDay = !isAllDay }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("全时段", fontSize = 13.sp, color = extended.text)
+                                Text("全天24小时随机提醒", fontSize = 11.sp, color = extended.muted)
+                            }
+                            // 开关
+                            Surface(
+                                modifier = Modifier.size(44.dp, 24.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isAllDay) extended.primary else extended.border,
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(2.dp)
+                                            .size(20.dp)
+                                            .background(Color.White, RoundedCornerShape(10.dp))
+                                            .align(if (isAllDay) Alignment.CenterEnd else Alignment.CenterStart),
+                                    )
+                                }
+                            }
+                        }
+                        // 非全时段时显示开始/结束时间
+                        if (!isAllDay) {
+                            TimeRow(
+                                label = "开始",
+                                hour = startHour,
+                                minute = startMinute,
+                                onTimeChange = { h, m ->
+                                    startHour = h
+                                    startMinute = m
+                                },
+                            )
+                            TimeRow(
+                                label = "结束",
+                                hour = endHour,
+                                minute = endMinute,
+                                onTimeChange = { h, m ->
+                                    endHour = h
+                                    endMinute = m
+                                },
+                            )
+                        }
                     }
                 }
 
@@ -293,7 +339,10 @@ fun TimerConfigScreen(
                                     Text("每", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
                                         value = intervalMinutes.toString(),
-                                        onValueChange = { intervalMinutes = it.toIntOrNull() ?: 1 },
+                                        onValueChange = { 
+                                            val value = it.toIntOrNull() ?: 1
+                                            intervalMinutes = value.coerceIn(1, 1440)
+                                        },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                             horizontal = 6.dp,
@@ -332,7 +381,10 @@ fun TimerConfigScreen(
                                     Text("每", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
                                         value = intervalMinutes.toString(),
-                                        onValueChange = { intervalMinutes = it.toIntOrNull() ?: 1 },
+                                        onValueChange = { 
+                                            val value = it.toIntOrNull() ?: 1
+                                            intervalMinutes = value.coerceIn(1, 1440)
+                                        },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                             horizontal = 6.dp,
@@ -351,7 +403,10 @@ fun TimerConfigScreen(
                                     Text("共", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
                                         value = reminderCount.toString(),
-                                        onValueChange = { reminderCount = it.toIntOrNull() ?: 1 },
+                                        onValueChange = { 
+                                            val value = it.toIntOrNull() ?: 1
+                                            reminderCount = value.coerceIn(1, 999)
+                                        },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                             horizontal = 6.dp,
@@ -363,6 +418,99 @@ fun TimerConfigScreen(
                                     )
                                     Text("次后结束", fontSize = 12.sp, color = extended.text)
                                 }
+                            }
+                        }
+
+                        // 随机间隔模式
+                        SelectCard(
+                            icon = "🎲",
+                            title = "随机间隔模式",
+                            desc = "基础间隔 × 随机倍数，用于睡眠辅助",
+                            selected = reminderSubType == ReminderSubType.RANDOM,
+                            onClick = { reminderSubType = ReminderSubType.RANDOM },
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(top = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                // 基础间隔
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text("基础间隔", fontSize = 12.sp, color = extended.text)
+                                    CompactInputField(
+                                        value = randomBaseInterval.toString(),
+                                        onValueChange = { 
+                                            val value = it.toIntOrNull() ?: 1
+                                            randomBaseInterval = value.coerceIn(1, 720)
+                                        },
+                                        fontSize = 12,
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                            horizontal = 6.dp,
+                                            vertical = 4.dp,
+                                        ),
+                                        cornerRadius = 6,
+                                        modifier = Modifier.width(48.dp),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Text("分钟", fontSize = 12.sp, color = extended.text)
+                                }
+                                // 倍数范围
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text("倍数", fontSize = 12.sp, color = extended.text)
+                                    CompactInputField(
+                                        value = randomMinMultiplier.toString(),
+                                        onValueChange = { 
+                                            val value = it.toIntOrNull() ?: 1
+                                            randomMinMultiplier = value.coerceIn(1, 999)
+                                            // 确保最小倍数不超过最大倍数
+                                            if (randomMinMultiplier > randomMaxMultiplier) {
+                                                randomMaxMultiplier = randomMinMultiplier
+                                            }
+                                        },
+                                        fontSize = 12,
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                            horizontal = 6.dp,
+                                            vertical = 4.dp,
+                                        ),
+                                        cornerRadius = 6,
+                                        modifier = Modifier.width(48.dp),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Text("~", fontSize = 12.sp, color = extended.text)
+                                    CompactInputField(
+                                        value = randomMaxMultiplier.toString(),
+                                        onValueChange = { 
+                                            val value = it.toIntOrNull() ?: 10
+                                            randomMaxMultiplier = value.coerceAtLeast(randomMinMultiplier)
+                                        },
+                                        fontSize = 12,
+                                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                            horizontal = 6.dp,
+                                            vertical = 4.dp,
+                                        ),
+                                        cornerRadius = 6,
+                                        modifier = Modifier.width(48.dp),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                                // 显示最大间隔
+                                val maxIntervalMinutes = randomBaseInterval * randomMaxMultiplier
+                                val maxIntervalText = if (maxIntervalMinutes >= 60) {
+                                    "${maxIntervalMinutes / 60}小时${maxIntervalMinutes % 60}分钟"
+                                } else {
+                                    "${maxIntervalMinutes}分钟"
+                                }
+                                Text(
+                                    "最大间隔: $maxIntervalText",
+                                    fontSize = 11.sp,
+                                    color = if (maxIntervalMinutes > 720) androidx.compose.ui.graphics.Color.Red else extended.muted,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
                             }
                         }
                     }
@@ -406,6 +554,55 @@ fun TimerConfigScreen(
                         checked = floatingWindowEnabled,
                         onCheckedChange = { floatingWindowEnabled = it },
                     )
+                    // 分割线
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(extended.border)
+                    )
+                    // 响铃时长
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text(
+                                "响铃时长",
+                                fontSize = 14.sp,
+                                color = extended.text,
+                            )
+                            Text(
+                                "闹钟响铃后自动关闭的时间",
+                                fontSize = 11.sp,
+                                color = extended.muted,
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            CompactInputField(
+                                value = alarmDuration.toString(),
+                                onValueChange = { 
+                                    val value = it.toIntOrNull() ?: 20
+                                    alarmDuration = value.coerceIn(5, 300)
+                                },
+                                fontSize = 12,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    horizontal = 6.dp,
+                                    vertical = 4.dp,
+                                ),
+                                cornerRadius = 6,
+                                modifier = Modifier.width(56.dp),
+                                textAlign = TextAlign.Center,
+                            )
+                            Text("秒", fontSize = 12.sp, color = extended.text)
+                        }
+                    }
                 }
             }
 
@@ -531,6 +728,11 @@ fun TimerConfigScreen(
                                 "闹钟将在每周 ${alarmHour.toString().padStart(2, '0')}:${alarmMinute.toString().padStart(2, '0')} 提醒"
                             timerType == TimerType.REMINDER && reminderSubType == ReminderSubType.LOOP ->
                                 "循环提醒将每隔 $intervalMinutes 分钟提醒一次，直到手动关闭"
+                            timerType == TimerType.REMINDER && reminderSubType == ReminderSubType.RANDOM -> {
+                                val maxInterval = randomBaseInterval * randomMaxMultiplier
+                                val maxText = if (maxInterval >= 60) "${maxInterval / 60}小时${maxInterval % 60}分钟" else "${maxInterval}分钟"
+                                "随机间隔提醒：基础间隔${randomBaseInterval}分钟，最大间隔$maxText"
+                            }
                             else ->
                                 "次数提醒将提醒 $reminderCount 次后自动停止"
                         },
@@ -562,9 +764,14 @@ fun TimerConfigScreen(
                     reminderSubType = reminderSubType,
                     intervalMinutes = intervalMinutes,
                     count = reminderCount,
+                    randomBaseInterval = randomBaseInterval,
+                    randomMinMultiplier = randomMinMultiplier,
+                    randomMaxMultiplier = randomMaxMultiplier,
+                    isAllDay = isAllDay,
                     alarmEnabled = alarmEnabled,
                     vibrationEnabled = vibrationEnabled,
                     floatingWindowEnabled = floatingWindowEnabled,
+                    alarmDuration = alarmDuration,
                     isEnabled = true,
                     linkedProjectId = linkedProjectId.toLong(),
                     message = "",

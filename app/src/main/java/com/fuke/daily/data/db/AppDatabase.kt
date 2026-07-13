@@ -111,6 +111,38 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 添加响铃时长字段（如果之前版本没有）
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "alarmDuration",
+            "INTEGER NOT NULL", "20"
+        )
+        // 添加随机间隔模式字段到 timers 表
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "randomBaseInterval",
+            "INTEGER NOT NULL", "1"
+        )
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "randomMinMultiplier",
+            "INTEGER NOT NULL", "1"
+        )
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "randomMaxMultiplier",
+            "INTEGER NOT NULL", "10"
+        )
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "isAllDay",
+            "INTEGER NOT NULL", "1"
+        )
+        // 添加暂停功能字段到 timers 表
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "isPaused",
+            "INTEGER NOT NULL", "0"
+        )
+    }
+}
+
 // ═══════════════════════════════════════════════════
 //  Hilt 模块 — 提供 Database 和 DAO 实例
 // ═══════════════════════════════════════════════════
@@ -127,7 +159,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "fuke-daily-db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .fallbackToDestructiveMigration()
             .build()
     }
