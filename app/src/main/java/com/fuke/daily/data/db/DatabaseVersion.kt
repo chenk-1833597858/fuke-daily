@@ -8,4 +8,4 @@ package com.fuke.daily.data.db
 //  3. 注册到 DatabaseModule
 // ═══════════════════════════════════════════════════
 
-const val DATABASE_VERSION = 8
+const val DATABASE_VERSION = 10

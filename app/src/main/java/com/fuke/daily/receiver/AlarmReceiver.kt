@@ -36,6 +36,20 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
 
+        // 验证触发时间是否准确（允许5分钟误差）
+        val prefs = context.getSharedPreferences("alarm_registry", Context.MODE_PRIVATE)
+        val expectedTriggerTime = prefs.getLong("task_${taskId}_expectedTrigger", 0)
+        val actualTriggerTime = System.currentTimeMillis()
+        val timeDiff = actualTriggerTime - expectedTriggerTime
+        
+        if (expectedTriggerTime > 0) {
+            if (kotlin.math.abs(timeDiff) > 5 * 60 * 1000) { // 超过5分钟误差
+                AppLogger.w("AlarmReceiver: 触发时间偏差过大: ${timeDiff / 1000}秒，预期=${java.text.SimpleDateFormat("MM-dd HH:mm:ss").format(java.util.Date(expectedTriggerTime))}，实际=${java.text.SimpleDateFormat("MM-dd HH:mm:ss").format(java.util.Date(actualTriggerTime))}")
+            } else {
+                AppLogger.i("AlarmReceiver: 触发时间准确: 偏差=${timeDiff / 1000}秒")
+            }
+        }
+
         // 记录闹钟触发
         TimerReminderService.recordAlarmTriggered(context, taskId)
 

@@ -582,11 +582,16 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
 
     private fun stopAlarmSound() {
         // 停止闹钟特效和铃声（不停止任务调度）
-        // 使用 TimerReminderService.stopEffectOnly() 静态方法，与原悬浮窗工具一致
-        TimerReminderService.stopEffectOnly(this)
+        // 使用 TimerReminderService.stopEffectOnly() 静态方法，传入当前触发的taskId
+        val taskId = TimerReminderService.getPendingMainlineTaskId()
+        if (taskId > 0) {
+            TimerReminderService.stopEffectOnly(this, taskId)
+        } else {
+            TimerReminderService.stopAllEffects(this)
+        }
         
         _isIconFlashing.value = false
-        AppLogger.i("FloatingWindowService: alarm stopped via TimerReminderService.stopEffectOnly()")
+        AppLogger.i("FloatingWindowService: alarm stopped via TimerReminderService.stopEffectOnly(taskId=$taskId)")
         
         // 双击停止闹钟后，展开悬浮弹窗显示内容（与原项目一致）
         AppLogger.i("FloatingWindowService: 双击停止闹钟，展开悬浮弹窗")
@@ -1106,7 +1111,7 @@ class FloatingWindowService : Service(), LifecycleOwner, SavedStateRegistryOwner
                     if (pendingTaskId > 0) {
                         AppLogger.i("FloatingWindowService: 有待处理的人生主线任务: taskId=$pendingTaskId")
                         // 停止闹钟
-                        TimerReminderService.stopEffectOnly(this@FloatingWindowService)
+                        TimerReminderService.stopEffectOnly(this@FloatingWindowService, pendingTaskId)
                         _isIconFlashing.value = false
                         // 清除待处理任务
                         TimerReminderService.clearPendingMainlineTask()

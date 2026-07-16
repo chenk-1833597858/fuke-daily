@@ -92,7 +92,11 @@ class TimerViewModel @Inject constructor(
 
     fun toggleTimer(id: Long, context: Context? = null) {
         val timer = _uiState.value.timers.find { it.id == id } ?: return
-        val updated = timer.copy(isEnabled = !timer.isEnabled)
+        val updated = timer.copy(
+            isEnabled = !timer.isEnabled,
+            // 从关到开时重置lastTriggerTime，使首次调度用startHour/startMinute作为起点
+            lastTriggerTime = if (!timer.isEnabled) 0L else timer.lastTriggerTime,
+        )
         viewModelScope.launch {
             timerRepo.updateTimer(updated)
             if (context != null) {
@@ -117,7 +121,7 @@ class TimerViewModel @Inject constructor(
             timerRepo.updateTimer(updated)
             // 前台暂停：取消当前调度但保留isEnabled
             if (context != null) {
-                TimerReminderService.cancelTask(context, id)
+                TimerReminderService.pauseTimer(context, id)
                 AppLogger.i("Timer: 任务已前台暂停: taskId=$id, isPaused=true")
             }
         }
@@ -130,7 +134,7 @@ class TimerViewModel @Inject constructor(
             timerRepo.updateTimer(updated)
             // 恢复调度
             if (context != null && updated.isEnabled) {
-                TimerReminderService.scheduleTask(context, updated)
+                TimerReminderService.resumeTimer(context, id)
                 AppLogger.i("Timer: 任务已恢复: taskId=$id, isPaused=false")
             }
         }

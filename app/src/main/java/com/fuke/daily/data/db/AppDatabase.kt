@@ -143,6 +143,31 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 添加随机间隔子模式字段
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "randomSubType",
+            "TEXT NOT NULL", "'LOOP'"
+        )
+        // 添加随机间隔次数字段
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "randomCount",
+            "INTEGER NOT NULL", "0"
+        )
+    }
+}
+
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 添加结束时间是否次日字段
+        MigrationUtils.addColumnIfNotExists(
+            db, "timers", "endIsNextDay",
+            "INTEGER NOT NULL", "0"
+        )
+    }
+}
+
 // ═══════════════════════════════════════════════════
 //  Hilt 模块 — 提供 Database 和 DAO 实例
 // ═══════════════════════════════════════════════════
@@ -159,7 +184,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "fuke-daily-db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .fallbackToDestructiveMigration()
             .build()
     }

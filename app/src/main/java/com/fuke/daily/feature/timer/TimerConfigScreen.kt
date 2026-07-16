@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
@@ -93,9 +94,22 @@ fun TimerConfigScreen(
     var randomBaseInterval by rememberSaveable { mutableIntStateOf(1) }
     var randomMinMultiplier by rememberSaveable { mutableIntStateOf(1) }
     var randomMaxMultiplier by rememberSaveable { mutableIntStateOf(10) }
+    var randomSubType by rememberSaveable { mutableStateOf("LOOP") }
+    var randomCount by rememberSaveable { mutableIntStateOf(0) }
     var isAllDay by rememberSaveable { mutableStateOf(true) }
+    var endIsNextDay by rememberSaveable { mutableStateOf(false) }
 
-    // 提醒方式
+    // 输入框中间文本状态（允许空字符串）
+    var intervalMinutesText by rememberSaveable { mutableStateOf("30") }
+    var reminderCountText by rememberSaveable { mutableStateOf("3") }
+    var randomBaseIntervalText by rememberSaveable { mutableStateOf("1") }
+    var randomMinMultiplierText by rememberSaveable { mutableStateOf("1") }
+    var randomMaxMultiplierText by rememberSaveable { mutableStateOf("10") }
+    var alarmDurationText by rememberSaveable { mutableStateOf("20") }
+    var randomCountText by rememberSaveable { mutableStateOf("0") }
+
+    // 超过12小时警告弹窗
+    var showOver12hDialog by rememberSaveable { mutableStateOf(false) }
     var alarmEnabled by rememberSaveable { mutableStateOf(true) }
     var vibrationEnabled by rememberSaveable { mutableStateOf(true) }
     var floatingWindowEnabled by rememberSaveable { mutableStateOf(true) }
@@ -122,16 +136,26 @@ fun TimerConfigScreen(
             endMinute = t.endMinute
             reminderSubType = t.reminderSubType
             intervalMinutes = t.intervalMinutes
+            intervalMinutesText = t.intervalMinutes.toString()
             reminderCount = t.count
+            reminderCountText = t.count.toString()
             // 加载随机间隔模式字段
             randomBaseInterval = t.randomBaseInterval
+            randomBaseIntervalText = t.randomBaseInterval.toString()
             randomMinMultiplier = t.randomMinMultiplier
+            randomMinMultiplierText = t.randomMinMultiplier.toString()
             randomMaxMultiplier = t.randomMaxMultiplier
+            randomMaxMultiplierText = t.randomMaxMultiplier.toString()
+            randomSubType = t.randomSubType
+            randomCount = t.randomCount
+            randomCountText = t.randomCount.toString()
             isAllDay = t.isAllDay
+            endIsNextDay = t.endIsNextDay
             alarmEnabled = t.alarmEnabled
             vibrationEnabled = t.vibrationEnabled
             floatingWindowEnabled = t.floatingWindowEnabled
             alarmDuration = t.alarmDuration
+            alarmDurationText = t.alarmDuration.toString()
             linkedProjectId = t.linkedProjectId.toInt()
         }
     }
@@ -308,15 +332,37 @@ fun TimerConfigScreen(
                                     startMinute = m
                                 },
                             )
-                            TimeRow(
-                                label = "结束",
-                                hour = endHour,
-                                minute = endMinute,
-                                onTimeChange = { h, m ->
-                                    endHour = h
-                                    endMinute = m
-                                },
-                            )
+                            // 结束时间 + 次日切换
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                TimeRow(
+                                    label = "结束",
+                                    hour = endHour,
+                                    minute = endMinute,
+                                    onTimeChange = { h, m ->
+                                        endHour = h
+                                        endMinute = m
+                                    },
+                                )
+                                // 次日切换按钮
+                                Surface(
+                                    modifier = Modifier
+                                        .clickable { endIsNextDay = !endIsNextDay },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (endIsNextDay) extended.primary else extended.inputBg,
+                                    border = BorderStroke(1.dp, if (endIsNextDay) extended.primary else extended.border),
+                                ) {
+                                    Text(
+                                        "次日",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (endIsNextDay) Color.White else extended.muted,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -338,10 +384,9 @@ fun TimerConfigScreen(
                                 ) {
                                     Text("每", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
-                                        value = intervalMinutes.toString(),
-                                        onValueChange = { 
-                                            val value = it.toIntOrNull() ?: 1
-                                            intervalMinutes = value.coerceIn(1, 1440)
+                                        value = intervalMinutesText,
+                                        onValueChange = {
+                                            intervalMinutesText = it.filter { c -> c.isDigit() }
                                         },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -380,10 +425,9 @@ fun TimerConfigScreen(
                                 ) {
                                     Text("每", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
-                                        value = intervalMinutes.toString(),
-                                        onValueChange = { 
-                                            val value = it.toIntOrNull() ?: 1
-                                            intervalMinutes = value.coerceIn(1, 1440)
+                                        value = intervalMinutesText,
+                                        onValueChange = {
+                                            intervalMinutesText = it.filter { c -> c.isDigit() }
                                         },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -402,10 +446,9 @@ fun TimerConfigScreen(
                                 ) {
                                     Text("共", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
-                                        value = reminderCount.toString(),
-                                        onValueChange = { 
-                                            val value = it.toIntOrNull() ?: 1
-                                            reminderCount = value.coerceIn(1, 999)
+                                        value = reminderCountText,
+                                        onValueChange = {
+                                            reminderCountText = it.filter { c -> c.isDigit() }
                                         },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -440,10 +483,9 @@ fun TimerConfigScreen(
                                 ) {
                                     Text("基础间隔", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
-                                        value = randomBaseInterval.toString(),
-                                        onValueChange = { 
-                                            val value = it.toIntOrNull() ?: 1
-                                            randomBaseInterval = value.coerceIn(1, 720)
+                                        value = randomBaseIntervalText,
+                                        onValueChange = {
+                                            randomBaseIntervalText = it.filter { c -> c.isDigit() }
                                         },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -463,14 +505,9 @@ fun TimerConfigScreen(
                                 ) {
                                     Text("倍数", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
-                                        value = randomMinMultiplier.toString(),
-                                        onValueChange = { 
-                                            val value = it.toIntOrNull() ?: 1
-                                            randomMinMultiplier = value.coerceIn(1, 999)
-                                            // 确保最小倍数不超过最大倍数
-                                            if (randomMinMultiplier > randomMaxMultiplier) {
-                                                randomMaxMultiplier = randomMinMultiplier
-                                            }
+                                        value = randomMinMultiplierText,
+                                        onValueChange = {
+                                            randomMinMultiplierText = it.filter { c -> c.isDigit() }
                                         },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -483,10 +520,9 @@ fun TimerConfigScreen(
                                     )
                                     Text("~", fontSize = 12.sp, color = extended.text)
                                     CompactInputField(
-                                        value = randomMaxMultiplier.toString(),
-                                        onValueChange = { 
-                                            val value = it.toIntOrNull() ?: 10
-                                            randomMaxMultiplier = value.coerceAtLeast(randomMinMultiplier)
+                                        value = randomMaxMultiplierText,
+                                        onValueChange = {
+                                            randomMaxMultiplierText = it.filter { c -> c.isDigit() }
                                         },
                                         fontSize = 12,
                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -498,6 +534,88 @@ fun TimerConfigScreen(
                                         textAlign = TextAlign.Center,
                                     )
                                 }
+
+                                // 随机间隔子模式：循环 / 次数
+                                Row(
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { randomSubType = "LOOP" },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (randomSubType == "LOOP") extended.primary else extended.light,
+                                        border = BorderStroke(1.dp, if (randomSubType == "LOOP") extended.primary else extended.border),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Text(
+                                                "🔄",
+                                                fontSize = 12.sp,
+                                            )
+                                            Text(
+                                                "循环模式",
+                                                fontSize = 12.sp,
+                                                color = if (randomSubType == "LOOP") Color.White else extended.text,
+                                            )
+                                        }
+                                    }
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { randomSubType = "COUNT" },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (randomSubType == "COUNT") extended.primary else extended.light,
+                                        border = BorderStroke(1.dp, if (randomSubType == "COUNT") extended.primary else extended.border),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        ) {
+                                            Text(
+                                                "🔢",
+                                                fontSize = 12.sp,
+                                            )
+                                            Text(
+                                                "次数模式",
+                                                fontSize = 12.sp,
+                                                color = if (randomSubType == "COUNT") Color.White else extended.text,
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // 次数模式时显示次数输入
+                                if (randomSubType == "COUNT") {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(top = 4.dp),
+                                    ) {
+                                        Text("共", fontSize = 12.sp, color = extended.text)
+                                        CompactInputField(
+                                            value = randomCountText,
+                                            onValueChange = {
+                                                randomCountText = it.filter { c -> c.isDigit() }
+                                            },
+                                            fontSize = 12,
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                                horizontal = 6.dp,
+                                                vertical = 4.dp,
+                                            ),
+                                            cornerRadius = 6,
+                                            modifier = Modifier.width(48.dp),
+                                            textAlign = TextAlign.Center,
+                                        )
+                                        Text("次后结束", fontSize = 12.sp, color = extended.text)
+                                    }
+                                }
+
                                 // 显示最大间隔
                                 val maxIntervalMinutes = randomBaseInterval * randomMaxMultiplier
                                 val maxIntervalText = if (maxIntervalMinutes >= 60) {
@@ -586,10 +704,9 @@ fun TimerConfigScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             CompactInputField(
-                                value = alarmDuration.toString(),
-                                onValueChange = { 
-                                    val value = it.toIntOrNull() ?: 20
-                                    alarmDuration = value.coerceIn(5, 300)
+                                value = alarmDurationText,
+                                onValueChange = {
+                                    alarmDurationText = it.filter { c -> c.isDigit() }
                                 },
                                 fontSize = 12,
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -729,9 +846,10 @@ fun TimerConfigScreen(
                             timerType == TimerType.REMINDER && reminderSubType == ReminderSubType.LOOP ->
                                 "循环提醒将每隔 $intervalMinutes 分钟提醒一次，直到手动关闭"
                             timerType == TimerType.REMINDER && reminderSubType == ReminderSubType.RANDOM -> {
-                                val maxInterval = randomBaseInterval * randomMaxMultiplier
+                                val maxInterval = randomBaseIntervalText.toIntOrNull()?.times(randomMaxMultiplierText.toIntOrNull() ?: 10) ?: 0
                                 val maxText = if (maxInterval >= 60) "${maxInterval / 60}小时${maxInterval % 60}分钟" else "${maxInterval}分钟"
-                                "随机间隔提醒：基础间隔${randomBaseInterval}分钟，最大间隔$maxText"
+                                val subTypeText = if (randomSubType == "LOOP") "无限循环" else "共${randomCountText}次"
+                                "随机间隔提醒：基础间隔${randomBaseIntervalText}分钟，最大间隔$maxText，$subTypeText"
                             }
                             else ->
                                 "次数提醒将提醒 $reminderCount 次后自动停止"
@@ -747,8 +865,38 @@ fun TimerConfigScreen(
         //  保存按钮
         // ══════════════════════════════════════
         val canSave = name.isNotBlank()
+
+        // 超过12小时警告弹窗
+        if (showOver12hDialog) {
+            AlertDialog(
+                onDismissRequest = { showOver12hDialog = false },
+                title = { Text("警告") },
+                text = { Text("随机间隔最大可能超过12小时（${randomBaseIntervalText.toIntOrNull()?.times(randomMaxMultiplierText.toIntOrNull() ?: 10) ?: 0}分钟），请调整参数。") },
+                confirmButton = {
+                    Button(onClick = { showOver12hDialog = false }) {
+                        Text("确定")
+                    }
+                },
+            )
+        }
+
         Button(
             onClick = {
+                // 解析输入值
+                val parsedIntervalMinutes = if (intervalMinutesText.isBlank()) 1 else intervalMinutesText.toIntOrNull() ?: 1
+                val parsedReminderCount = if (reminderCountText.isBlank()) 1 else reminderCountText.toIntOrNull() ?: 1
+                val parsedRandomBaseInterval = if (randomBaseIntervalText.isBlank()) 1 else randomBaseIntervalText.toIntOrNull() ?: 1
+                val parsedRandomMinMultiplier = if (randomMinMultiplierText.isBlank()) 1 else randomMinMultiplierText.toIntOrNull() ?: 1
+                val parsedRandomMaxMultiplier = if (randomMaxMultiplierText.isBlank()) 10 else randomMaxMultiplierText.toIntOrNull() ?: 10
+                val parsedAlarmDuration = if (alarmDurationText.isBlank()) 20 else alarmDurationText.toIntOrNull() ?: 20
+                val parsedRandomCount = if (randomCountText.isBlank()) 0 else randomCountText.toIntOrNull() ?: 0
+
+                // 检查超过12小时
+                if (reminderSubType == ReminderSubType.RANDOM && parsedRandomBaseInterval * parsedRandomMaxMultiplier > 720) {
+                    showOver12hDialog = true
+                    return@Button
+                }
+
                 val timer = TimerItem(
                     id = if (timerId > 0) timerId else 0,
                     name = name,
@@ -761,17 +909,20 @@ fun TimerConfigScreen(
                     startMinute = startMinute,
                     endHour = endHour,
                     endMinute = endMinute,
+                    endIsNextDay = endIsNextDay,
                     reminderSubType = reminderSubType,
-                    intervalMinutes = intervalMinutes,
-                    count = reminderCount,
-                    randomBaseInterval = randomBaseInterval,
-                    randomMinMultiplier = randomMinMultiplier,
-                    randomMaxMultiplier = randomMaxMultiplier,
+                    intervalMinutes = parsedIntervalMinutes,
+                    count = parsedReminderCount,
+                    randomBaseInterval = parsedRandomBaseInterval,
+                    randomMinMultiplier = parsedRandomMinMultiplier,
+                    randomMaxMultiplier = parsedRandomMaxMultiplier,
+                    randomSubType = randomSubType,
+                    randomCount = parsedRandomCount,
                     isAllDay = isAllDay,
                     alarmEnabled = alarmEnabled,
                     vibrationEnabled = vibrationEnabled,
                     floatingWindowEnabled = floatingWindowEnabled,
-                    alarmDuration = alarmDuration,
+                    alarmDuration = parsedAlarmDuration,
                     isEnabled = true,
                     linkedProjectId = linkedProjectId.toLong(),
                     message = "",

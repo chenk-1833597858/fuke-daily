@@ -24,6 +24,7 @@ data class TimerItem(
     val startMinute: Int = 0,
     val endHour: Int = 0,
     val endMinute: Int = 0,
+    val endIsNextDay: Boolean = false,       // 结束时间是否是次日（如8:00到次日4:00）
     val reminderSubType: ReminderSubType = ReminderSubType.LOOP,
     val intervalMinutes: Int = 0,          // 循环间隔（分钟）
     val count: Int = 0,                    // 次数
@@ -31,6 +32,8 @@ data class TimerItem(
     val randomBaseInterval: Int = 1,       // 基础间隔（分钟）
     val randomMinMultiplier: Int = 1,      // 最小倍数
     val randomMaxMultiplier: Int = 10,     // 最大倍数
+    val randomSubType: String = "LOOP",    // 随机间隔子模式: "LOOP"=循环, "COUNT"=次数
+    val randomCount: Int = 0,              // 次数模式的总次数
     val isAllDay: Boolean = true,          // 全时段
     // 提醒方式
     val alarmEnabled: Boolean = true,      // 闹铃

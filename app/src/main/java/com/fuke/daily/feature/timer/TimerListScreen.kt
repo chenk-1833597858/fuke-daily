@@ -1,8 +1,6 @@
 package com.fuke.daily.feature.timer
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DismissDirection
@@ -39,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +59,7 @@ import com.fuke.daily.data.model.ReminderSubType
 import com.fuke.daily.data.model.dayOfWeekLabels
 import com.fuke.daily.ui.theme.FukeTheme
 import com.fuke.daily.feature.timer.TimerViewModel
+import kotlinx.coroutines.delay
 
 // ═══════════════════════════════════════════════════
 //  定时任务列表页
@@ -193,9 +192,35 @@ private fun TimerCard(
         TimerType.REMINDER -> Color(0xFF6BA3D6)
     }
 
-    val typeIcon = when (timer.type) {
-        TimerType.ALARM -> Icons.Default.Alarm
-        TimerType.REMINDER -> Icons.Default.AccessTime
+    // 每秒刷新倒计时
+    var tick by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timer.isEnabled, timer.nextTriggerTime) {
+        if (timer.isEnabled && timer.nextTriggerTime > 0) {
+            while (true) {
+                tick = System.currentTimeMillis()
+                delay(1000)
+            }
+        }
+    }
+
+    // 用 tick 触发重组，实时计算倒计时文本
+    val nextTriggerTextLive = if (timer.isEnabled && timer.nextTriggerTime > 0) {
+        val now = tick
+        val diff = timer.nextTriggerTime - now
+        if (diff > 0) {
+            val hours = diff / 3600000
+            val minutes = (diff % 3600000) / 60000
+            val seconds = (diff % 60000) / 1000
+            when {
+                hours > 0 -> "${hours}时${minutes}分后"
+                minutes > 0 -> "${minutes}分${seconds}秒后"
+                else -> "${seconds}秒后"
+            }
+        } else {
+            "即将触发"
+        }
+    } else {
+        null
     }
 
     Surface(
@@ -211,15 +236,6 @@ private fun TimerCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = typeIcon,
-                    contentDescription = timer.type.displayName,
-                    tint = typeColor,
-                    modifier = Modifier.size(18.dp),
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 Text(
                     text = timer.name.ifBlank { "未命名" },
                     fontSize = 15.sp,
@@ -290,21 +306,17 @@ private fun TimerCard(
                         )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                // 提醒方式图标
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (timer.alarmEnabled) {
-                        Text("🔔", fontSize = 12.sp)
-                    }
-                    if (timer.vibrationEnabled) {
-                        Text("📳", fontSize = 12.sp)
-                    }
-                    if (timer.floatingWindowEnabled) {
-                        Text("🪟", fontSize = 12.sp)
-                    }
-                }
+            // 下次触发时间（实时倒计时）
+            if (nextTriggerTextLive != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "⏱ $nextTriggerTextLive",
+                    fontSize = 12.sp,
+                    color = typeColor,
+                    fontWeight = FontWeight.Medium,
+                )
             }
 
             // 关联项目
