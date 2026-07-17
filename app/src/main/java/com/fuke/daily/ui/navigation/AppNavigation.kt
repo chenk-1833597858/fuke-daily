@@ -28,6 +28,8 @@ import com.fuke.daily.ui.settings.SettingsScreen
 import com.fuke.daily.ui.selection.SelectionConfigScreen
 import com.fuke.daily.feature.timer.TimerConfigScreen
 import com.fuke.daily.feature.timer.TimerListScreen
+import com.fuke.daily.feature.chat.ChatScreen
+import com.fuke.daily.feature.chat.ChatApiSettingsScreen
 import com.fuke.daily.ui.imagelist.ImageListScreen
 
 // ═══════════════════════════════════════════════════
@@ -51,6 +53,8 @@ object Routes {
     const val LOGS = "logs"
     const val SETTINGS = "settings"
     const val IMAGE_LIST = "imageList/{subListId}"
+    const val CHAT = "chat"
+    const val CHAT_API_SETTINGS = "chat/apiSettings"
 }
 
 // ═══════════════════════════════════════════════════
@@ -108,6 +112,7 @@ fun AppNavigation(
                 onNavigateToMainline = { navController.navigate(Routes.MAINLINE_DAILY) },
                 onNavigateToLogs = { navController.navigate(Routes.LOGS) },
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToChat = { navController.navigate(Routes.CHAT) },
                 onNavigateToMainlineDetail = { listId ->
                     navController.navigate("mainline/detail/$listId")
                 },
@@ -257,6 +262,19 @@ fun AppNavigation(
             ImageListScreen(
                 subListId = subListId,
                 onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.CHAT) {
+            ChatScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(Routes.CHAT_API_SETTINGS) },
+            )
+        }
+
+        composable(Routes.CHAT_API_SETTINGS) {
+            ChatApiSettingsScreen(
+                onBack = { navController.popBackStack() },
             )
         }
     }

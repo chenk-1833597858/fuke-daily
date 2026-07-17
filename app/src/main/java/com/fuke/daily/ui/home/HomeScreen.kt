@@ -45,6 +45,7 @@ fun HomeScreen(
     onNavigateToMainline: () -> Unit,
     onNavigateToLogs: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToChat: () -> Unit = {},
     onNavigateToMainlineDetail: (Long) -> Unit,
     onNavigateToRichText: (Long) -> Unit,
     onNavigateToQuizConfig: (Long) -> Unit,
@@ -123,24 +124,46 @@ fun HomeScreen(
                     color = FukeTheme.extended.text,
                 )
 
-                // 设置按钮
-                Surface(
-                    modifier = Modifier
-                        .height(32.dp)
-                        .clickable { onNavigateToSettings() },
-                    shape = RoundedCornerShape(16.dp),
-                    color = extended.light,
-                    border = BorderStroke(1.dp, extended.border),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                // AI聊天 + 设置按钮
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        modifier = Modifier
+                            .height(32.dp)
+                            .clickable { onNavigateToChat() },
+                        shape = RoundedCornerShape(16.dp),
+                        color = extended.light,
+                        border = BorderStroke(1.dp, extended.border),
                     ) {
-                        Text(
-                            text = "⚙️",
-                            fontSize = 12.sp,
-                            color = extended.muted,
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "🤖",
+                                fontSize = 12.sp,
+                                color = extended.muted,
+                            )
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .height(32.dp)
+                            .clickable { onNavigateToSettings() },
+                        shape = RoundedCornerShape(16.dp),
+                        color = extended.light,
+                        border = BorderStroke(1.dp, extended.border),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "⚙️",
+                                fontSize = 12.sp,
+                                color = extended.muted,
+                            )
+                        }
                     }
                 }
             }
