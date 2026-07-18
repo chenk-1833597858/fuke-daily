@@ -31,6 +31,7 @@ import com.fuke.daily.data.model.AppUpdateInfo
 import com.fuke.daily.ui.components.*
 import com.fuke.daily.ui.theme.FukeTheme
 import com.fuke.daily.ui.theme.ThemeMode
+import com.fuke.daily.util.AppLogger
 import com.fuke.daily.util.AppUpdater
 import com.fuke.daily.viewmodel.MainViewModel
 
@@ -62,8 +63,9 @@ fun HomeScreen(
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf("") }
     var checkMessage by remember { mutableStateOf("") }
+    var downloadedApkFile by remember { mutableStateOf<java.io.File?>(null) }
 
-    fun doCheckUpdate() {
+    fun doCheckUpdate(skipInterval: Boolean = false) {
         if (isChecking) return
         isChecking = true
         checkMessage = ""
@@ -71,9 +73,11 @@ fun HomeScreen(
             val info = AppUpdater.checkUpdate(context)
             isChecking = false
             if (info != null) {
-                // 检查3天跳过间隔
-                if (AppUpdater.shouldShowUpdate(context, info.versionCode)) {
+                // 手动检查跳过3天限制，自动检查受3天限制
+                if (skipInterval || AppUpdater.shouldShowUpdate(context, info.versionCode)) {
                     updateInfo = info
+                } else {
+                    checkMessage = "已跳过，3天内不再提示"
                 }
             } else {
                 checkMessage = "已是最新版本"
@@ -84,21 +88,33 @@ fun HomeScreen(
     // ── 启动时自动检查更新 ──
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(1500) // 延迟1.5秒，避免启动卡顿
-        val info = AppUpdater.checkUpdate(context)
-        if (info != null && AppUpdater.shouldShowUpdate(context, info.versionCode)) {
-            updateInfo = info
+        try {
+            val info = AppUpdater.checkUpdate(context)
+            if (info != null && AppUpdater.shouldShowUpdate(context, info.versionCode)) {
+                updateInfo = info
+            }
+        } catch (_: Exception) {
+            // 静默失败，不影响使用
         }
     }
 
     fun doDownloadAndInstall() {
-        if (isDownloading) return
+        // 如果已经下载过，直接重新安装
+        val existingApk = downloadedApkFile
+        if (existingApk != null && existingApk.exists()) {
+            AppUpdater.installApk(context, existingApk)
+            return
+        }
+
         val info = updateInfo ?: return
+        if (isDownloading) return
         isDownloading = true
         downloadProgress = "下载中…"
         kotlinx.coroutines.MainScope().launch {
             val apkFile = AppUpdater.downloadApk(context, info)
             isDownloading = false
             if (apkFile != null) {
+                downloadedApkFile = apkFile
                 downloadProgress = "下载完成，正在安装…"
                 AppUpdater.installApk(context, apkFile)
             } else {
@@ -219,7 +235,7 @@ fun HomeScreen(
                 onTabSelect = { index ->
                     when (index) {
                         0 -> viewModel.setBottomTab(0) // 项目页，保持在首页
-                        1 -> onNavigateToTimer() // 定时页，不修改tab状态
+                        1 -> onNavigateToTimer() // 定时页
                     }
                 },
             )
@@ -307,6 +323,7 @@ fun HomeScreen(
             info = updateInfo!!,
             isDownloading = isDownloading,
             downloadProgress = downloadProgress,
+            hasDownloadedApk = downloadedApkFile != null && downloadedApkFile!!.exists(),
             onConfirm = { doDownloadAndInstall() },
             onDismiss = {
                 AppUpdater.recordSkip(context, updateInfo!!.versionCode)
@@ -464,6 +481,7 @@ fun UpdateDialog(
     info: AppUpdateInfo,
     isDownloading: Boolean,
     downloadProgress: String,
+    hasDownloadedApk: Boolean = false,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -501,7 +519,11 @@ fun UpdateDialog(
                 enabled = !isDownloading,
             ) {
                 Text(
-                    if (isDownloading) "下载中…" else "立即更新",
+                    when {
+                        isDownloading -> "下载中…"
+                        hasDownloadedApk -> "重新安装"
+                        else -> "立即更新"
+                    },
                     color = if (isDownloading) extended.muted else extended.primary,
                 )
             }

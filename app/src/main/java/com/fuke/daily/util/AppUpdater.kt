@@ -88,15 +88,12 @@ object AppUpdater {
 
         for ((name, url) in sources) {
             try {
-                AppLogger.d("检查更新 [$name]: $url")
                 val info = fetchUpdateInfo(url)
                 if (info != null && info.versionCode > currentCode) {
-                    AppLogger.d("发现新版本: ${info.versionName} (来源: $name)")
-                    // 记录来源，下载时按此URL
+                    AppLogger.d("发现新版本: v${info.versionName} (来源: $name)")
                     return@withContext info.copy(source = name)
                 }
                 if (info != null) {
-                    AppLogger.d("[$name] 已是最新版本")
                     // 服务器能连上且无需更新，直接返回null
                     if (name == "服务器") return@withContext null
                 }

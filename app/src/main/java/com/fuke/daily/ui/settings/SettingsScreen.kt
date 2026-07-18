@@ -1,5 +1,6 @@
 package com.fuke.daily.ui.settings
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -152,13 +153,13 @@ fun SettingsScreen(
                 )
             }
             
-            // ── 日志（正式版隐藏）──
-            // SettingItem(
-            //     icon = Icons.Filled.Description,
-            //     title = "日志",
-            //     subtitle = "查看应用运行日志",
-            //     onClick = onNavigateToLogs,
-            // )
+            // ── 日志 ──
+            SettingItem(
+                icon = Icons.Filled.Description,
+                title = "日志",
+                subtitle = "查看应用运行日志",
+                onClick = onNavigateToLogs,
+            )
             
             // ── 检查更新 ──
             SettingItem(
@@ -173,7 +174,10 @@ fun SettingsScreen(
                         val info = AppUpdater.checkUpdate(context)
                         isChecking = false
                         if (info != null) {
-                            checkMessage = "发现新版本 v${info.versionName}"
+                            // 手动检查不受3天限制，清除跳过记录让首页能弹窗
+                            context.getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+                                .edit().clear().apply()
+                            checkMessage = "发现新版本 v${info.versionName}，请返回首页更新"
                         } else {
                             checkMessage = "已是最新版本"
                         }

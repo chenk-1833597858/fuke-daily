@@ -63,7 +63,6 @@ fun BottomNav(
                 selected = selectedIndex == 1,
                 onSelect = { onTabSelect(1) },
             )
-            // 日志tab正式版隐藏，需要时可通过设置页或直接输入路由访问
         }
     }
 }
