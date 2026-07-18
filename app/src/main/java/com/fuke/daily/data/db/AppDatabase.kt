@@ -8,9 +8,6 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.fuke.daily.data.model.*
-import com.fuke.daily.feature.chat.ApiConfig
-import com.fuke.daily.feature.chat.ChatMessage
-import com.fuke.daily.feature.chat.Conversation
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,21 +32,15 @@ import javax.inject.Singleton
         QuizCard::class,
         LinkRecord::class,
         TimerItem::class,
-        ApiConfig::class,
-        Conversation::class,
-        ChatMessage::class,
     ],
     version = DATABASE_VERSION,
     exportSchema = false,
 )
-@TypeConverters(ListTypeConverters::class, TimerTypeConverters::class, ChatTypeConverters::class)
+@TypeConverters(ListTypeConverters::class, TimerTypeConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun mainListDao(): MainListDao
     abstract fun timerDao(): TimerDao
     abstract fun linkHistoryDao(): LinkHistoryDao
-    abstract fun apiConfigDao(): com.fuke.daily.feature.chat.ApiConfigDao
-    abstract fun conversationDao(): com.fuke.daily.feature.chat.ConversationDao
-    abstract fun chatMessageDao(): com.fuke.daily.feature.chat.ChatMessageDao
 }
 
 // ═══════════════════════════════════════════════════
@@ -177,50 +168,6 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
-val MIGRATION_10_11 = object : Migration(10, 11) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        // 创建AI聊天相关表
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS chat_api_configs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                name TEXT NOT NULL,
-                baseUrl TEXT NOT NULL,
-                apiKey TEXT NOT NULL,
-                model TEXT NOT NULL,
-                isActive INTEGER NOT NULL DEFAULT 0,
-                maxTokens INTEGER NOT NULL DEFAULT 4096,
-                temperature REAL NOT NULL DEFAULT 0.7,
-                systemPrompt TEXT NOT NULL DEFAULT '',
-                createdAt INTEGER NOT NULL DEFAULT 0
-            )
-        """)
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS chat_conversations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                title TEXT NOT NULL DEFAULT '新对话',
-                apiConfigId INTEGER NOT NULL DEFAULT 0,
-                systemPrompt TEXT NOT NULL DEFAULT '',
-                createdAt INTEGER NOT NULL DEFAULT 0,
-                updatedAt INTEGER NOT NULL DEFAULT 0
-            )
-        """)
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS chat_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                conversationId INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                toolCalls TEXT NOT NULL DEFAULT '',
-                toolCallId TEXT NOT NULL DEFAULT '',
-                isStreaming INTEGER NOT NULL DEFAULT 0,
-                createdAt INTEGER NOT NULL DEFAULT 0,
-                FOREIGN KEY (conversationId) REFERENCES chat_conversations(id) ON DELETE CASCADE
-            )
-        """)
-        db.execSQL("CREATE INDEX IF NOT EXISTS index_chat_messages_conversationId ON chat_messages(conversationId)")
-    }
-}
-
 // ═══════════════════════════════════════════════════
 //  Hilt 模块 — 提供 Database 和 DAO 实例
 // ═══════════════════════════════════════════════════
@@ -237,7 +184,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "fuke-daily-db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -250,13 +197,4 @@ object DatabaseModule {
 
     @Provides
     fun provideLinkHistoryDao(db: AppDatabase): LinkHistoryDao = db.linkHistoryDao()
-
-    @Provides
-    fun provideApiConfigDao(db: AppDatabase): com.fuke.daily.feature.chat.ApiConfigDao = db.apiConfigDao()
-
-    @Provides
-    fun provideConversationDao(db: AppDatabase): com.fuke.daily.feature.chat.ConversationDao = db.conversationDao()
-
-    @Provides
-    fun provideChatMessageDao(db: AppDatabase): com.fuke.daily.feature.chat.ChatMessageDao = db.chatMessageDao()
 }
