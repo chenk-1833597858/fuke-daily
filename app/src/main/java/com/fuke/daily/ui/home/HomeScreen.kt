@@ -220,7 +220,6 @@ fun HomeScreen(
                     when (index) {
                         0 -> viewModel.setBottomTab(0) // 项目页，保持在首页
                         1 -> onNavigateToTimer() // 定时页，不修改tab状态
-                        2 -> onNavigateToLogs() // 记忆页，不修改tab状态
                     }
                 },
             )

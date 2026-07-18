@@ -152,13 +152,13 @@ fun SettingsScreen(
                 )
             }
             
-            // ── 日志 ──
-            SettingItem(
-                icon = Icons.Filled.Description,
-                title = "日志",
-                subtitle = "查看应用运行日志",
-                onClick = onNavigateToLogs,
-            )
+            // ── 日志（正式版隐藏）──
+            // SettingItem(
+            //     icon = Icons.Filled.Description,
+            //     title = "日志",
+            //     subtitle = "查看应用运行日志",
+            //     onClick = onNavigateToLogs,
+            // )
             
             // ── 检查更新 ──
             SettingItem(

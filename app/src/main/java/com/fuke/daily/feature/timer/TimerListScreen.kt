@@ -288,12 +288,21 @@ private fun TimerCard(
                         )
                     }
                     TimerType.REMINDER -> {
-                        Text(
-                            text = "${timer.startHour.toString().padStart(2, '0')}:${timer.startMinute.toString().padStart(2, '0')} - ${timer.endHour.toString().padStart(2, '0')}:${timer.endMinute.toString().padStart(2, '0')}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = extended.text,
-                        )
+                        if (timer.isAllDay) {
+                            Text(
+                                text = "全天",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = extended.text,
+                            )
+                        } else {
+                            Text(
+                                text = "${timer.startHour.toString().padStart(2, '0')}:${timer.startMinute.toString().padStart(2, '0')} - ${timer.endHour.toString().padStart(2, '0')}:${timer.endMinute.toString().padStart(2, '0')}",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = extended.text,
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = when (timer.reminderSubType) {

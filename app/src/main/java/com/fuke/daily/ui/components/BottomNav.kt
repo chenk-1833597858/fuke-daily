@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,7 +29,7 @@ import com.fuke.daily.ui.theme.FukeTheme
 /**
  * 底部导航栏
  *
- * @param selectedIndex 当前选中的tab索引（0=项目, 1=定时, 2=记忆）
+ * @param selectedIndex 当前选中的tab索引（0=项目, 1=定时）
  * @param onTabSelect 切换tab回调
  */
 @Composable
@@ -64,12 +63,7 @@ fun BottomNav(
                 selected = selectedIndex == 1,
                 onSelect = { onTabSelect(1) },
             )
-            BottomNavItem(
-                icon = Icons.Filled.PlayArrow,
-                label = "日志",
-                selected = selectedIndex == 2,
-                onSelect = { onTabSelect(2) },
-            )
+            // 日志tab正式版隐藏，需要时可通过设置页或直接输入路由访问
         }
     }
 }
