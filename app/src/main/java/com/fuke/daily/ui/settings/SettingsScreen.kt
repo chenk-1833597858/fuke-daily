@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fuke.daily.ui.theme.FukeTheme
 import com.fuke.daily.ui.theme.ThemeMode
+import com.fuke.daily.util.AppUpdater
 import com.fuke.daily.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -169,10 +170,13 @@ fun SettingsScreen(
                     isChecking = true
                     checkMessage = ""
                     scope.launch {
-                        // 模拟检查更新（实际应调用 AppUpdater.checkUpdate）
-                        kotlinx.coroutines.delay(1000)
+                        val info = AppUpdater.checkUpdate(context)
                         isChecking = false
-                        checkMessage = "已是最新版本"
+                        if (info != null) {
+                            checkMessage = "发现新版本 v${info.versionName}"
+                        } else {
+                            checkMessage = "已是最新版本"
+                        }
                     }
                 },
             )

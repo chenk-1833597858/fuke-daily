@@ -71,10 +71,22 @@ fun HomeScreen(
             val info = AppUpdater.checkUpdate(context)
             isChecking = false
             if (info != null) {
-                updateInfo = info
+                // 检查3天跳过间隔
+                if (AppUpdater.shouldShowUpdate(context, info.versionCode)) {
+                    updateInfo = info
+                }
             } else {
                 checkMessage = "已是最新版本"
             }
+        }
+    }
+
+    // ── 启动时自动检查更新 ──
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1500) // 延迟1.5秒，避免启动卡顿
+        val info = AppUpdater.checkUpdate(context)
+        if (info != null && AppUpdater.shouldShowUpdate(context, info.versionCode)) {
+            updateInfo = info
         }
     }
 
@@ -297,7 +309,10 @@ fun HomeScreen(
             isDownloading = isDownloading,
             downloadProgress = downloadProgress,
             onConfirm = { doDownloadAndInstall() },
-            onDismiss = { updateInfo = null },
+            onDismiss = {
+                AppUpdater.recordSkip(context, updateInfo!!.versionCode)
+                updateInfo = null
+            },
         )
     }
 

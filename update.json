@@ -1,7 +1,7 @@
 {
-  "versionCode": 3,
-  "versionName": "1.2.0",
-  "apkUrl": "http://101.33.200.139:15839/fuke-daily/app-release.apk",
-  "updateLog": "1. 新增App自动更新检查\n2. 修复已知问题",
+  "versionCode": 4,
+  "versionName": "1.3.0",
+  "apkUrl": "",
+  "updateLog": "1. 移除AI聊天功能（已独立为AI聊天App）\\n2. 新增自动检查更新\\n3. 跳过更新后3天再提示\\n4. 设置页检查更新改为真实检测",
   "forceUpdate": false
 }

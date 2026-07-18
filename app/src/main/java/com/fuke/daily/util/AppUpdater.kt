@@ -20,21 +20,53 @@ import java.net.URL
 /**
  * App自动更新工具
  *
- * 降级链：服务器(主) → 码云(查地址) → GitHub(查地址) → 码云(直下APK) → GitHub(直下APK)
+ * 降级链：服务器(主) → GitHub(查地址)
+ * 跳过逻辑：用户点"稍后再说"后3天内不再提示
  */
 object AppUpdater {
 
     // ── 更新源 ──
     private const val SERVER_UPDATE_URL = "http://101.33.200.139:15839/api/update"
-    private const val GITEE_UPDATE_URL = "https://gitee.com/yiguan/yiguan/raw/main/update.json"
     private const val GITHUB_UPDATE_URL = "https://raw.githubusercontent.com/chenk-1833597858/fuke-daily/main/update.json"
 
-    // ── Release直链（最后降级，直接拼版本号下载APK） ──
-    private const val GITEE_RELEASE_BASE = "https://gitee.com/yiguan/yiguan/releases/download"
+    // ── Release直链 ──
     private const val GITHUB_RELEASE_BASE = "https://github.com/chenk-1833597858/fuke-daily/releases/download"
 
     private const val APK_DIR = "updates"
     private const val APK_FILENAME = "app-release.apk"
+
+    // ── 跳过提示相关 ──
+    private const val PREFS_NAME = "app_update_prefs"
+    private const val KEY_LAST_SKIP_TIME = "last_skip_time"
+    private const val KEY_SKIPPED_VERSION = "skipped_version_code"
+    private const val SKIP_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000L  // 3天
+
+    /**
+     * 是否应该提示更新（检查3天跳过间隔）
+     */
+    fun shouldShowUpdate(context: Context, versionCode: Int): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val skippedVersion = prefs.getInt(KEY_SKIPPED_VERSION, 0)
+        val lastSkipTime = prefs.getLong(KEY_LAST_SKIP_TIME, 0L)
+
+        // 如果是不同版本，重置跳过记录
+        if (skippedVersion != versionCode) return true
+
+        // 同一版本，检查3天间隔
+        val elapsed = System.currentTimeMillis() - lastSkipTime
+        return elapsed >= SKIP_INTERVAL_MS
+    }
+
+    /**
+     * 记录用户跳过了本次更新
+     */
+    fun recordSkip(context: Context, versionCode: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putLong(KEY_LAST_SKIP_TIME, System.currentTimeMillis())
+            .putInt(KEY_SKIPPED_VERSION, versionCode)
+            .apply()
+    }
 
     /**
      * 检查更新，返回更新信息（null=无需更新或全部源失败）
@@ -45,7 +77,6 @@ object AppUpdater {
         // 降级链：依次尝试各源
         val sources = listOf(
             "服务器" to SERVER_UPDATE_URL,
-            "码云" to GITEE_UPDATE_URL,
             "GitHub" to GITHUB_UPDATE_URL,
         )
 
@@ -85,15 +116,12 @@ object AppUpdater {
         // 构建降级下载URL列表
         val downloadUrls = mutableListOf<String>()
 
-        // 1. 服务器/码云/GitHub给的apkUrl
+        // 1. 服务器/GitHub给的apkUrl
         if (!info.apkUrl.isNullOrEmpty()) {
             downloadUrls.add(info.apkUrl)
         }
 
-        // 2. 码云Release直链
-        downloadUrls.add("$GITEE_RELEASE_BASE/$tagName/$APK_FILENAME")
-
-        // 3. GitHub Release直链
+        // 2. GitHub Release直链
         downloadUrls.add("$GITHUB_RELEASE_BASE/$tagName/$APK_FILENAME")
 
         // 依次尝试
