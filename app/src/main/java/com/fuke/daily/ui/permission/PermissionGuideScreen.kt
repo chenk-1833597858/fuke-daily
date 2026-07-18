@@ -268,26 +268,31 @@ fun PermissionGuideScreen(
         ) {
             androidx.compose.material3.Button(
                 onClick = {
-                    // 刷新权限状态后再回调
+                    // 刷新权限状态
                     hasOverlay = Settings.canDrawOverlays(context)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         hasNotification = context.checkSelfPermission(
                             android.Manifest.permission.POST_NOTIFICATIONS
                         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
                     }
+                    // 必须权限没给，不让进
+                    if (!hasOverlay || !hasNotification) return@Button
                     onAllRequiredPermissionsGranted()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
                 shape = RoundedCornerShape(12.dp),
+                enabled = hasOverlay && hasNotification,
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                     containerColor = if (allRequiredGranted) extended.success else extended.accent,
                     contentColor = if (allRequiredGranted) androidx.compose.ui.graphics.Color.White else extended.text,
+                    disabledContainerColor = extended.accent.copy(alpha = 0.4f),
+                    disabledContentColor = extended.text.copy(alpha = 0.5f),
                 ),
             ) {
                 Text(
-                    text = if (allRequiredGranted) "进入应用" else "我已开启权限",
+                    text = if (allRequiredGranted) "进入应用" else "请先开启必须权限",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                 )

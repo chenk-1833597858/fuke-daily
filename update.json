@@ -1,7 +1,7 @@
 {
-  "versionCode": 4,
-  "versionName": "1.3.0",
-  "apkUrl": "",
-  "updateLog": "1. 移除AI聊天功能（已独立为AI聊天App）\\n2. 新增自动检查更新\\n3. 跳过更新后3天再提示\\n4. 设置页检查更新改为真实检测",
+  "versionCode": 6,
+  "versionName": "1.3.2",
+  "apkUrl": "/fuke-daily/app-release.apk",
+  "updateLog": "1. 权限引导页必须权限未开启时禁止进入\\n2. 按钮状态与权限实际状态同步\\n3. 修复下载更新失败的问题",
   "forceUpdate": false
 }

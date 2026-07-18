@@ -124,7 +124,10 @@ object AppUpdater {
             downloadUrls.add(info.apkUrl)
         }
 
-        // 2. GitHub Release直链
+        // 2. 服务器默认下载地址
+        downloadUrls.add("http://101.33.200.139:15839/api/download")
+
+        // 3. GitHub Release直链
         downloadUrls.add("$GITHUB_RELEASE_BASE/$tagName/$APK_FILENAME")
 
         // 依次尝试
