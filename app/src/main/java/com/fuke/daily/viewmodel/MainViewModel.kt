@@ -31,6 +31,7 @@ data class HomeUiState(
 class MainViewModel @Inject constructor(
     private val mainListRepo: MainListRepo,
     private val appPrefs: AppPrefs,
+    private val appDatabase: com.fuke.daily.data.db.AppDatabase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -184,5 +185,55 @@ class MainViewModel @Inject constructor(
 
     fun setBottomTab(index: Int) {
         _uiState.update { it.copy(currentBottomTab = index) }
+    }
+
+    // ── 数据库操作 ──
+
+    /**
+     * 关闭数据库连接，触发WAL自动checkpoint
+     * 导出数据库前调用，确保导出的文件包含最新数据
+     */
+    fun closeDatabaseForCheckpoint() {
+        appDatabase.closeForCheckpoint()
+    }
+
+    /**
+     * 获取Room数据库实例
+     */
+    fun getDatabase(): com.fuke.daily.data.db.AppDatabase = appDatabase
+
+    /**
+     * 导出单个项目数据为独立.db文件
+     * 调用前需先closeDatabaseForCheckpoint()确保数据已checkpoint
+     *
+     * @param mainListId 要导出的项目ID
+     * @param context Context
+     * @return 临时文件（调用方负责用SAF写入用户选择的位置后删除）
+     */
+    suspend fun exportProject(mainListId: Long, context: android.content.Context): java.io.File {
+        return com.fuke.daily.util.ProjectExporter.exportProject(context, mainListId)
+    }
+
+    /**
+     * 刷新数据（导出关闭数据库后重新加载）
+     */
+    fun refreshData() {
+        viewModelScope.launch {
+            mainListRepo.getAllLists().collect { lists ->
+                val sorted = lists.sortedWith(
+                    compareBy<MainList> { if (it.type == ListType.MAINLINE) 0 else 1 }
+                        .thenBy { if (it.type != ListType.MAINLINE && !it.pinned) 1 else 0 }
+                        .thenByDescending { if (it.pinned) it.updatedAt else 0L }
+                        .thenByDescending { if (it.type != ListType.MAINLINE && !it.pinned) it.createdAt else 0L }
+                )
+                _cachedLists.value = sorted
+                _uiState.update { state ->
+                    state.copy(
+                        lists = sorted,
+                        hasMainline = lists.any { it.type == ListType.MAINLINE },
+                    )
+                }
+            }
+        }
     }
 }

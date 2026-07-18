@@ -26,7 +26,8 @@ import java.net.URL
 object AppUpdater {
 
     // ── 更新源 ──
-    private const val SERVER_UPDATE_URL = "http://101.33.200.139:15839/api/update"
+    private const val SERVER_BASE_URL = "http://101.33.200.139:15839"
+    private const val SERVER_UPDATE_URL = "${SERVER_BASE_URL}/api/update"
     private const val GITHUB_UPDATE_URL = "https://raw.githubusercontent.com/chenk-1833597858/fuke-daily/main/update.json"
 
     // ── Release直链 ──
@@ -119,15 +120,23 @@ object AppUpdater {
         // 构建降级下载URL列表
         val downloadUrls = mutableListOf<String>()
 
-        // 1. 服务器/GitHub给的apkUrl
+        // 1. 服务器/GitHub给的apkUrl（可能是相对路径，补全域名）
         if (!info.apkUrl.isNullOrEmpty()) {
-            downloadUrls.add(info.apkUrl)
+            val fullUrl = if (info.apkUrl.startsWith("http")) {
+                info.apkUrl
+            } else {
+                "${SERVER_BASE_URL}${info.apkUrl}"
+            }
+            downloadUrls.add(fullUrl)
         }
 
-        // 2. 服务器默认下载地址
-        downloadUrls.add("http://101.33.200.139:15839/api/download")
+        // 2. 服务器默认下载地址（兜底，永远不会被漏掉）
+        downloadUrls.add("${SERVER_BASE_URL}/api/download")
 
-        // 3. GitHub Release直链
+        // 3. 码云（占位，暂未部署）
+        // downloadUrls.add("https://gitee.com/xxx/fuke-daily/releases/download/$tagName/$APK_FILENAME")
+
+        // 4. GitHub Release直链
         downloadUrls.add("$GITHUB_RELEASE_BASE/$tagName/$APK_FILENAME")
 
         // 依次尝试

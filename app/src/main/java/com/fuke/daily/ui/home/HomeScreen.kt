@@ -15,6 +15,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -266,9 +270,54 @@ fun HomeScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameText by remember { mutableStateOf("") }
     
+    // ── 单项目导出 ──
+    var pendingExportMainListId by remember { mutableStateOf<Long?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    val exportProjectLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/x-sqlite3")
+    ) { uri ->
+        uri?.let {
+            val mainListId = pendingExportMainListId ?: return@let
+            pendingExportMainListId = null
+            MainScope().launch {
+                try {
+                    val tempFile = withContext(Dispatchers.IO) {
+                        // 关闭数据库，触发WAL checkpoint
+                        viewModel.closeDatabaseForCheckpoint()
+                        Thread.sleep(300)
+                        // 导出项目数据
+                        viewModel.exportProject(mainListId, context)
+                    }
+                    // 写入SAF uri
+                    withContext(Dispatchers.IO) {
+                        AppLogger.i("导出项目：临时文件大小=${tempFile.length()}字节, 路径=${tempFile.absolutePath}")
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            tempFile.inputStream().use { input ->
+                                input.copyTo(output)
+                            }
+                        }
+                        // 删除临时文件
+                        tempFile.delete()
+                    }
+                    AppLogger.i("导出项目：成功, mainListId=$mainListId")
+                    snackbarHostState.showSnackbar("导出成功")
+                    // 刷新数据（数据库已关闭，需要重新加载）
+                    viewModel.refreshData()
+                } catch (e: Exception) {
+                    AppLogger.e("导出项目失败: ${e.message}")
+                    snackbarHostState.showSnackbar("导出失败: ${e.message}")
+                    viewModel.refreshData()
+                }
+            }
+        }
+    }
+    
     if (uiState.showItemActionDialog && actionItem != null) {
+        val isMainline = actionItem.type == ListType.MAINLINE
         ItemActionDialog(
             item = actionItem,
+            isMainline = isMainline,
             onPin = {
                 viewModel.pinList(actionItem.id)
                 viewModel.dismissItemActionDialog()
@@ -280,6 +329,15 @@ fun HomeScreen(
             onRename = {
                 renameText = actionItem.name
                 showRenameDialog = true
+                viewModel.dismissItemActionDialog()
+            },
+            onExport = {
+                // 构建文件名：项目名_备份_日期.db
+                val dateStr = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault())
+                    .format(java.util.Date())
+                val fileName = "${actionItem.name}_备份_${dateStr}.db"
+                exportProjectLauncher.launch(fileName)
+                pendingExportMainListId = actionItem.id
                 viewModel.dismissItemActionDialog()
             },
             onDismiss = { viewModel.dismissItemActionDialog() },
@@ -364,9 +422,11 @@ fun HomeScreen(
 @Composable
 private fun ItemActionDialog(
     item: MainList,
+    isMainline: Boolean = false,
     onPin: () -> Unit,
     onDelete: () -> Unit,
     onRename: () -> Unit,
+    onExport: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val extended = FukeTheme.extended
@@ -420,6 +480,27 @@ private fun ItemActionDialog(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // 导出项目按钮（人生主线不显示）
+                if (!isMainline) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onExport),
+                        shape = RoundedCornerShape(8.dp),
+                        color = extended.light,
+                    ) {
+                        Text(
+                            text = "📤 导出项目",
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            fontSize = 15.sp,
+                            color = extended.primary,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // 删除按钮
                 Surface(

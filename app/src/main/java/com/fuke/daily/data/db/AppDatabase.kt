@@ -41,6 +41,15 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mainListDao(): MainListDao
     abstract fun timerDao(): TimerDao
     abstract fun linkHistoryDao(): LinkHistoryDao
+
+    /**
+     * 关闭数据库连接，触发WAL自动checkpoint
+     * 导出数据库前调用，确保导出的文件包含最新数据
+     * 调用后需要重新获取数据库实例（Room会自动重新打开）
+     */
+    fun closeForCheckpoint() {
+        openHelper.close()
+    }
 }
 
 // ═══════════════════════════════════════════════════

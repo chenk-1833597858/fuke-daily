@@ -1,7 +1,7 @@
 {
-  "versionCode": 6,
-  "versionName": "1.3.2",
+  "versionCode": 7,
+  "versionName": "1.4.0",
   "apkUrl": "/fuke-daily/app-release.apk",
-  "updateLog": "1. 权限引导页必须权限未开启时禁止进入\\n2. 按钮状态与权限实际状态同步\\n3. 修复下载更新失败的问题",
+  "updateLog": "1. 修复导出数据库WAL缓存问题\\n2. 导出时可选是否包含人生主线\\n3. 导入时人生主线冲突可选择覆盖或跳过\\n4. 新增单项目导出功能（长按项目→导出项目）\\n5. 单项目导出文件兼容导入校验",
   "forceUpdate": false
 }

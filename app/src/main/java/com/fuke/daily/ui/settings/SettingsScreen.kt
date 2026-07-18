@@ -3,7 +3,6 @@ package com.fuke.daily.ui.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,11 +25,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.fuke.daily.data.model.ListType
 import com.fuke.daily.ui.theme.FukeTheme
 import com.fuke.daily.ui.theme.ThemeMode
 import com.fuke.daily.util.AppUpdater
+import com.fuke.daily.util.AppLogger
+import com.fuke.daily.util.DatabaseImportMerger
 import com.fuke.daily.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
+
+/**
+ * 导入状态
+ */
+sealed class ImportState {
+    data object Idle : ImportState()           // 空闲
+    data object Validating : ImportState()      // 校验中
+    data class PartialMatch(
+        val similarity: Float,
+        val matchedTables: List<String>,
+        val missingTables: List<String>,
+        val uri: Uri
+    ) : ImportState()                          // 部分匹配，需要用户确认
+    data object Merging : ImportState()         // 合并中
+    data class Success(val counts: Map<String, Int>) : ImportState()  // 成功
+    data class Error(val message: String) : ImportState()             // 失败
+    data object Mismatch : ImportState()        // 文件不匹配
+    data class MainlineConflict(val uri: Uri) : ImportState()  // 导入文件含人生主线，当前也有
+}
 
 /**
  * 设置页面
@@ -52,6 +73,9 @@ fun SettingsScreen(
     // 更新检查状态
     var isChecking by remember { mutableStateOf(false) }
     var checkMessage by remember { mutableStateOf("") }
+
+    // 导入状态
+    var importState by remember { mutableStateOf<ImportState>(ImportState.Idle) }
 
     Scaffold(
         topBar = {
@@ -187,34 +211,151 @@ fun SettingsScreen(
             
             // ── 数据备份与恢复 ──
             var showBackupDialog by remember { mutableStateOf(false) }
+            var backupMessage by remember { mutableStateOf("") }
+            var showExportMainlineDialog by remember { mutableStateOf(false) }
+            var exportIncludeMainline by remember { mutableStateOf(true) }
             
-            // 文件选择器（导入）
-            val importLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.GetContent()
+            // 导出：SAF让用户选择保存位置
+            val exportLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.CreateDocument("application/x-sqlite3")
             ) { uri ->
                 uri?.let {
-                    try {
-                        val dbFile = File(context.getDatabasePath("fuke-daily-db").absolutePath)
-                        context.contentResolver.openInputStream(it)?.use { input ->
-                            dbFile.outputStream().use { output ->
-                                input.copyTo(output)
+                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            val dbPath = context.getDatabasePath("fuke-daily-db").absolutePath
+                            val dbFile = File(dbPath)
+                            
+                            // 关闭Room数据库连接，触发WAL自动checkpoint
+                            viewModel.closeDatabaseForCheckpoint()
+                            Thread.sleep(300)
+                            
+                            // 复制到临时文件
+                            val tempFile = File(context.cacheDir, "export_full_temp.db")
+                            if (tempFile.exists()) tempFile.delete()
+                            dbFile.copyTo(tempFile, overwrite = true)
+                            
+                            // 如果用户选择不包含人生主线，删除相关数据
+                            if (!exportIncludeMainline) {
+                                val tempDb = android.database.sqlite.SQLiteDatabase.openDatabase(
+                                    tempFile.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
+                                )
+                                val cursor = tempDb.query("main_lists", arrayOf("id"), "type='MAINLINE'", null, null, null, null)
+                                val mainlineIds = mutableListOf<Long>()
+                                while (cursor.moveToNext()) {
+                                    mainlineIds.add(cursor.getLong(0))
+                                }
+                                cursor.close()
+                                
+                                if (mainlineIds.isNotEmpty()) {
+                                    val idsStr = mainlineIds.joinToString(",")
+                                    AppLogger.i("导出：删除人生主线, ids=$idsStr")
+                                    tempDb.delete("mainline_items", "branchId IN (SELECT id FROM mainline_branches WHERE parentListId IN ($idsStr))", null)
+                                    tempDb.delete("mainline_branches", "parentListId IN ($idsStr)", null)
+                                    tempDb.delete("sub_lists", "parentListId IN ($idsStr)", null)
+                                    tempDb.delete("content_configs", "parentListId IN ($idsStr)", null)
+                                    tempDb.delete("option_buttons", "parentListId IN ($idsStr)", null)
+                                    tempDb.delete("rich_texts", "parentListId IN ($idsStr)", null)
+                                    tempDb.delete("quiz_cards", "groupId IN (SELECT id FROM quiz_groups WHERE parentListId IN ($idsStr))", null)
+                                    tempDb.delete("quiz_groups", "parentListId IN ($idsStr)", null)
+                                    tempDb.delete("main_lists", "type='MAINLINE'", null)
+                                }
+                                tempDb.close()
+                            }
+                            
+                            // 导出临时文件
+                            context.contentResolver.openOutputStream(uri)?.use { output ->
+                                tempFile.inputStream().use { input ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            tempFile.delete()
+                            AppLogger.i("导出：成功")
+                            
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                backupMessage = "导出成功"
+                            }
+                        } catch (e: Exception) {
+                            AppLogger.e("导出失败: ${e.message}")
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                backupMessage = "导出失败: ${e.message}"
                             }
                         }
-                        // 重启应用以加载新数据库
-                        val restartIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                        restartIntent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        context.startActivity(restartIntent)
-                        android.os.Process.killProcess(android.os.Process.myPid())
-                    } catch (e: Exception) {
-                        // 导入失败
                     }
                 }
             }
             
+            // 导入：SAF让用户选择文件
+            val importLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                uri?.let {
+                    // 开始校验
+                    importState = ImportState.Validating
+                    try {
+                        AppLogger.d("导入：开始校验，uri=$it")
+                        val result = DatabaseImportMerger.validateSchema(context, it)
+                        AppLogger.d("导入：校验结果 similarity=${result.similarity}, matchedTables=${result.matchedTables}, missingTables=${result.missingTables}, fieldMatchRatio=${result.fieldMatchRatio}, hasMainline=${result.hasMainline}")
+                        when {
+                            result.similarity < 0.5f -> {
+                                // 不匹配
+                                importState = ImportState.Mismatch
+                            }
+                            result.similarity <= 0.8f -> {
+                                // 部分匹配，需要用户确认
+                                importState = ImportState.PartialMatch(
+                                    similarity = result.similarity,
+                                    matchedTables = result.matchedTables,
+                                    missingTables = result.missingTables,
+                                    uri = it
+                                )
+                            }
+                            else -> {
+                                // 高匹配度，检查人生主线冲突
+                                val currentHasMainline = uiState.lists.any { it.type == ListType.MAINLINE }
+                                if (result.hasMainline && currentHasMainline) {
+                                    // 两边都有人生主线，需要用户选择
+                                    importState = ImportState.MainlineConflict(uri = it)
+                                } else {
+                                    // 直接导入
+                                    performMerge(context, it) { newState ->
+                                        importState = newState
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.e("导入：校验异常 ${e.message}\n${e.stackTraceToString()}")
+                        importState = ImportState.Error("校验失败: ${e.message}")
+                    }
+                }
+            }
+            
+            // 导入状态显示文本
+            val importSubtitle = when (val state = importState) {
+                is ImportState.Idle -> ""
+                is ImportState.Validating -> "校验中…"
+                is ImportState.PartialMatch -> "等待确认导入"
+                is ImportState.Merging -> "合并中…"
+                is ImportState.Success -> {
+                    val total = state.counts.values.sum()
+                    "导入成功，共导入 $total 条数据"
+                }
+                is ImportState.Error -> state.message
+                is ImportState.Mismatch -> "文件不匹配"
+                is ImportState.MainlineConflict -> "人生主线冲突"
+            }
+
+            // 备份恢复的副标题：优先显示导入状态，其次显示导出状态
+            val backupSubtitle = when {
+                importSubtitle.isNotEmpty() -> importSubtitle
+                backupMessage.isNotEmpty() -> backupMessage
+                else -> "导出/导入 .db 文件"
+            }
+
             SettingItem(
                 icon = Icons.Filled.Backup,
                 title = "数据备份与恢复",
-                subtitle = "导出/导入 .db 文件",
+                subtitle = backupSubtitle,
                 onClick = {
                     showBackupDialog = true
                 },
@@ -225,19 +366,20 @@ fun SettingsScreen(
                 AlertDialog(
                     onDismissRequest = { showBackupDialog = false },
                     title = { Text("数据备份与恢复") },
-                    text = { Text("选择操作：导出当前数据或导入备份文件") },
+                    text = { Text("导出：将当前数据保存为.db文件\n导入：从.db文件合并数据（追加方式，不会覆盖现有数据）") },
                     confirmButton = {
                         TextButton(
                             onClick = {
                                 showBackupDialog = false
-                                // 导出：复制数据库文件到 Downloads
-                                try {
-                                    val dbFile = File(context.getDatabasePath("fuke-daily-db").absolutePath)
-                                    val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                                // 检查是否有人生主线
+                                val hasMainline = uiState.lists.any { it.type == ListType.MAINLINE }
+                                if (hasMainline) {
+                                    showExportMainlineDialog = true
+                                } else {
+                                    exportIncludeMainline = true
                                     val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                                    val backupFile = File(downloadsDir, "fuke_daily_backup_$dateStr.db")
-                                    dbFile.copyTo(backupFile, overwrite = true)
-                                } catch (_: Exception) {}
+                                    exportLauncher.launch("fuke_daily_backup_$dateStr.db")
+                                }
                             }
                         ) {
                             Text("导出")
@@ -247,8 +389,9 @@ fun SettingsScreen(
                         TextButton(
                             onClick = {
                                 showBackupDialog = false
-                                // 导入：启动文件选择器
-                                importLauncher.launch("*/*")
+                                // 重置导入状态
+                                importState = ImportState.Idle
+                                importLauncher.launch(arrayOf("application/x-sqlite3", "*/*"))
                             }
                         ) {
                             Text("导入")
@@ -256,8 +399,220 @@ fun SettingsScreen(
                     },
                 )
             }
+            
+            // ── 导出人生主线选择弹窗 ──
+            if (showExportMainlineDialog) {
+                AlertDialog(
+                    onDismissRequest = { showExportMainlineDialog = false },
+                    title = { Text("人生主线") },
+                    text = { Text("检测到人生主线数据，是否包含在导出文件中？") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showExportMainlineDialog = false
+                                exportIncludeMainline = true
+                                val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                exportLauncher.launch("fuke_daily_backup_$dateStr.db")
+                            }
+                        ) {
+                            Text("包含")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showExportMainlineDialog = false
+                                exportIncludeMainline = false
+                                val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                exportLauncher.launch("fuke_daily_backup_$dateStr.db")
+                            }
+                        ) {
+                            Text("不包含")
+                        }
+                    },
+                )
+            }
+
+            // ── 导入状态对话框 ──
+            when (val state = importState) {
+                is ImportState.Validating -> {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        title = { Text("导入数据") },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                Text("正在校验数据库格式…")
+                            }
+                        },
+                        confirmButton = {},
+                    )
+                }
+
+                is ImportState.Mismatch -> {
+                    AlertDialog(
+                        onDismissRequest = { importState = ImportState.Idle },
+                        title = { Text("导入失败") },
+                        text = { Text("文件不匹配，无法导入。\n该数据库结构与当前应用不兼容。") },
+                        confirmButton = {
+                            TextButton(onClick = { importState = ImportState.Idle }) {
+                                Text("确定")
+                            }
+                        },
+                    )
+                }
+
+                is ImportState.PartialMatch -> {
+                    val simPercent = (state.similarity * 100).toInt()
+                    val missingInfo = if (state.missingTables.isNotEmpty()) {
+                        "\n缺失的表：${state.missingTables.joinToString(", ")}"
+                    } else ""
+                    AlertDialog(
+                        onDismissRequest = { importState = ImportState.Idle },
+                        title = { Text("文件部分匹配") },
+                        text = { Text("数据库匹配度：$simPercent%\n可能丢失部分数据。$missingInfo\n\n是否继续导入？") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    performMerge(context, state.uri) { newState ->
+                                        importState = newState
+                                    }
+                                }
+                            ) {
+                                Text("继续导入")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { importState = ImportState.Idle }) {
+                                Text("取消")
+                            }
+                        },
+                    )
+                }
+
+                is ImportState.Merging -> {
+                    AlertDialog(
+                        onDismissRequest = {},
+                        title = { Text("导入数据") },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                Text("正在合并数据…")
+                            }
+                        },
+                        confirmButton = {},
+                    )
+                }
+
+                is ImportState.Success -> {
+                    val total = state.counts.values.sum()
+                    val detail = state.counts.entries
+                        .filter { entry -> entry.value > 0 }
+                        .joinToString("\n") { entry -> "${entry.key}: ${entry.value} 条" }
+                    AlertDialog(
+                        onDismissRequest = { restartApp(context) },
+                        title = { Text("导入成功") },
+                        text = {
+                            Text("共导入 $total 条数据\n\n$detail\n\n应用将重启以生效。")
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { restartApp(context) }) {
+                                Text("重启应用")
+                            }
+                        },
+                    )
+                }
+
+                is ImportState.Error -> {
+                    AlertDialog(
+                        onDismissRequest = { importState = ImportState.Idle },
+                        title = { Text("导入失败") },
+                        text = { Text(state.message) },
+                        confirmButton = {
+                            TextButton(onClick = { importState = ImportState.Idle }) {
+                                Text("确定")
+                            }
+                        },
+                    )
+                }
+
+                is ImportState.MainlineConflict -> {
+                    AlertDialog(
+                        onDismissRequest = { importState = ImportState.Idle },
+                        title = { Text("人生主线冲突") },
+                        text = { Text("导入文件包含人生主线数据，当前应用也已有人生主线。\n\n是否用导入的人生主线覆盖当前的？") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    // 覆盖：先删当前人生主线，再导入
+                                    performMerge(context, state.uri, overwriteMainline = true) { newState ->
+                                        importState = newState
+                                    }
+                                }
+                            ) {
+                                Text("覆盖")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    // 不覆盖：跳过人生主线，导入其他数据
+                                    performMerge(context, state.uri, overwriteMainline = false) { newState ->
+                                        importState = newState
+                                    }
+                                }
+                            ) {
+                                Text("跳过主线")
+                            }
+                        },
+                    )
+                }
+
+                else -> { /* Idle, no dialog */ }
+            }
         }
     }
+}
+
+/**
+ * 执行合并操作（同步，因为用户偏好本地数据库查询不用协程）
+ */
+private fun performMerge(
+    context: Context,
+    uri: Uri,
+    overwriteMainline: Boolean = true,
+    onStateUpdate: (ImportState) -> Unit,
+) {
+    onStateUpdate(ImportState.Merging)
+    try {
+        AppLogger.d("导入：开始合并数据, overwriteMainline=$overwriteMainline")
+        val result = DatabaseImportMerger.mergeData(context, uri, overwriteMainline)
+        AppLogger.d("导入：合并结果 success=${result.success}, counts=${result.importedCounts}, error=${result.error}")
+        if (result.success) {
+            onStateUpdate(ImportState.Success(result.importedCounts))
+        } else {
+            onStateUpdate(ImportState.Error(result.error ?: "未知错误"))
+        }
+    } catch (e: Exception) {
+        AppLogger.e("导入：合并异常 ${e.message}\n${e.stackTraceToString()}")
+        onStateUpdate(ImportState.Error("合并失败: ${e.message}"))
+    }
+}
+
+/**
+ * 重启App
+ */
+private fun restartApp(context: Context) {
+    val restartIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+    restartIntent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+    context.startActivity(restartIntent)
+    android.os.Process.killProcess(android.os.Process.myPid())
 }
 
 @Composable
