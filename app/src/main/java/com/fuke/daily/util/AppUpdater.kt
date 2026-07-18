@@ -43,14 +43,20 @@ object AppUpdater {
 
     /**
      * 是否应该提示更新（检查3天跳过间隔）
+     * @param context 上下文
+     * @param serverVersionCode 服务器返回的版本号
      */
-    fun shouldShowUpdate(context: Context, versionCode: Int): Boolean {
+    fun shouldShowUpdate(context: Context, serverVersionCode: Int): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val skippedVersion = prefs.getInt(KEY_SKIPPED_VERSION, 0)
         val lastSkipTime = prefs.getLong(KEY_LAST_SKIP_TIME, 0L)
+        val currentCode = getCurrentVersionCode(context)
 
-        // 如果是不同版本，重置跳过记录
-        if (skippedVersion != versionCode) return true
+        // 如果当前App版本已经>=服务器版本，不需要更新
+        if (currentCode >= serverVersionCode) return false
+
+        // 如果跳过的是不同版本（说明服务器出了新版），重新提示
+        if (skippedVersion != serverVersionCode) return true
 
         // 同一版本，检查3天间隔
         val elapsed = System.currentTimeMillis() - lastSkipTime
