@@ -108,8 +108,9 @@ object AppUpdater {
 
     /**
      * 下载APK，按降级链尝试
+     * @param onSourceChange 当切换下载源时回调，参数为源编号和描述（含URL）
      */
-    suspend fun downloadApk(context: Context, info: AppUpdateInfo): File? = withContext(Dispatchers.IO) {
+    suspend fun downloadApk(context: Context, info: AppUpdateInfo, onSourceChange: ((Int, String) -> Unit)? = null): File? = withContext(Dispatchers.IO) {
         val dir = File(context.getExternalFilesDir(null), APK_DIR)
         if (!dir.exists()) dir.mkdirs()
         dir.listFiles()?.forEach { it.delete() }
@@ -118,43 +119,80 @@ object AppUpdater {
         val tagName = "v${info.versionName}"
 
         // 构建降级下载URL列表
-        val downloadUrls = mutableListOf<String>()
+        data class DownloadSource(val url: String, val label: String)
 
-        // 1. 服务器/GitHub给的apkUrl（可能是相对路径，补全域名）
+        val downloadSources = mutableListOf<DownloadSource>()
+
+        // 1. 服务器update.json里的apkUrl（动态地址，服务器可随时变更）
         if (!info.apkUrl.isNullOrEmpty()) {
             val fullUrl = if (info.apkUrl.startsWith("http")) {
                 info.apkUrl
             } else {
                 "${SERVER_BASE_URL}${info.apkUrl}"
             }
-            downloadUrls.add(fullUrl)
+            downloadSources.add(DownloadSource(fullUrl, "服务器①"))
         }
 
-        // 2. 服务器默认下载地址（兜底，永远不会被漏掉）
-        downloadUrls.add("${SERVER_BASE_URL}/api/download")
+        // 2. 服务器固定下载地址（兜底）
+        downloadSources.add(DownloadSource("${SERVER_BASE_URL}/api/download", "服务器②"))
 
         // 3. 码云（占位，暂未部署）
-        // downloadUrls.add("https://gitee.com/xxx/fuke-daily/releases/download/$tagName/$APK_FILENAME")
+        // downloadSources.add(DownloadSource("https://gitee.com/xxx/fuke-daily/releases/download/$tagName/$APK_FILENAME", "码云③"))
 
         // 4. GitHub Release直链
-        downloadUrls.add("$GITHUB_RELEASE_BASE/$tagName/$APK_FILENAME")
+        downloadSources.add(DownloadSource("$GITHUB_RELEASE_BASE/$tagName/$APK_FILENAME", "GitHub④"))
 
-        // 依次尝试
-        for ((index, url) in downloadUrls.withIndex()) {
+        // 下载前：检查所有下载源状态
+        onSourceChange?.invoke(0, "检查下载源…")
+        val sourceStatuses = mutableListOf<String>()
+        for (source in downloadSources) {
+            val status = checkSourceStatus(source.url)
+            val statusText = if (status == 200) "✓" else "✗($status)"
+            val statusLine = "${source.label} $statusText ${source.url}"
+            sourceStatuses.add(statusLine)
+            AppLogger.d("下载源检查 [${source.label}]: $status ${source.url}")
+        }
+        // 状态信息写日志，UI只显示检查中
+        AppLogger.d("下载源状态:\\n${sourceStatuses.joinToString("\\n")}")
+        kotlinx.coroutines.delay(800)
+
+        // 依次尝试下载
+        for ((index, source) in downloadSources.withIndex()) {
             try {
-                AppLogger.d("下载APK [源${index + 1}]: $url")
-                val file = downloadFile(url, apkFile)
+                AppLogger.d("下载APK [${source.label}]: ${source.url}")
+                onSourceChange?.invoke(index + 1, "")
+                val file = downloadFile(source.url, apkFile)
                 if (file != null) {
-                    AppLogger.d("下载成功 [源${index + 1}]")
+                    AppLogger.d("下载成功 [${source.label}]")
+                    onSourceChange?.invoke(index + 1, "")
                     return@withContext file
                 }
             } catch (e: Exception) {
-                AppLogger.d("下载失败 [源${index + 1}]: ${e.message}")
+                AppLogger.d("下载失败 [${source.label}]: ${e.message}")
             }
         }
 
         AppLogger.e("所有下载源均失败")
         null
+    }
+
+    /**
+     * 检查下载源状态（HTTP HEAD请求）
+     * @return HTTP状态码，0表示连接失败
+     */
+    private fun checkSourceStatus(url: String): Int {
+        return try {
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "HEAD"
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.instanceFollowRedirects = true
+            val code = conn.responseCode
+            conn.disconnect()
+            code
+        } catch (e: Exception) {
+            0
+        }
     }
 
     /**

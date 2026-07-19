@@ -113,9 +113,11 @@ fun HomeScreen(
         val info = updateInfo ?: return
         if (isDownloading) return
         isDownloading = true
-        downloadProgress = "下载中…"
+        downloadProgress = "正在下载…"
         kotlinx.coroutines.MainScope().launch {
-            val apkFile = AppUpdater.downloadApk(context, info)
+            val apkFile = AppUpdater.downloadApk(context, info) { _, _ ->
+                // 源切换信息已在日志中，UI只显示"正在下载…"
+            }
             isDownloading = false
             if (apkFile != null) {
                 downloadedApkFile = apkFile
@@ -601,7 +603,7 @@ fun UpdateDialog(
             ) {
                 Text(
                     when {
-                        isDownloading -> "下载中…"
+                        isDownloading -> downloadProgress.ifEmpty { "正在下载…" }
                         hasDownloadedApk -> "重新安装"
                         else -> "立即更新"
                     },
