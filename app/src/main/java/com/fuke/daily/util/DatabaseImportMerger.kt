@@ -66,6 +66,7 @@ object DatabaseImportMerger {
         val success: Boolean,
         val importedCounts: Map<String, Int>,
         val error: String? = null,
+        val idMappings: Map<String, Map<Long, Long>> = emptyMap(),  // 表名 → 旧ID→新ID
     )
 
     /**
@@ -344,7 +345,8 @@ object DatabaseImportMerger {
             deleteDbFiles(context, TEMP_IMPORT_DB)
 
             AppLogger.d("导入：合并完成 ${importedCounts.entries.filter { it.value > 0 }.joinToString { "${it.key}=${it.value}" }}")
-            return MergeResult(true, importedCounts)
+            AppLogger.d("导入：ID映射 sub_lists=${idMappings["sub_lists"]}")
+            return MergeResult(true, importedCounts, idMappings = idMappings)
 
         } catch (e: Exception) {
             AppLogger.e("导入：合并失败 ${e.message}")

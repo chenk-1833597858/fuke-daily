@@ -31,6 +31,8 @@ import com.fuke.daily.ui.theme.ThemeMode
 import com.fuke.daily.util.AppUpdater
 import com.fuke.daily.util.AppLogger
 import com.fuke.daily.util.DatabaseImportMerger
+import com.fuke.daily.util.FukeBackupExporter
+import com.fuke.daily.util.FukeBackupImporter
 import com.fuke.daily.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -217,58 +219,25 @@ fun SettingsScreen(
             
             // 导出：SAF让用户选择保存位置
             val exportLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.CreateDocument("application/x-sqlite3")
+                contract = ActivityResultContracts.CreateDocument("application/octet-stream")
             ) { uri ->
                 uri?.let {
                     kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         try {
-                            val dbPath = context.getDatabasePath("fuke-daily-db").absolutePath
-                            val dbFile = File(dbPath)
-                            
                             // 关闭Room数据库连接，触发WAL自动checkpoint
                             viewModel.closeDatabaseForCheckpoint()
                             Thread.sleep(300)
                             
-                            // 复制到临时文件
-                            val tempFile = File(context.cacheDir, "export_full_temp.db")
-                            if (tempFile.exists()) tempFile.delete()
-                            dbFile.copyTo(tempFile, overwrite = true)
+                            // 使用 FukeBackupExporter 打包 .fuke 文件
+                            val fukeFile = FukeBackupExporter.exportFullBackup(context, !exportIncludeMainline)
                             
-                            // 如果用户选择不包含人生主线，删除相关数据
-                            if (!exportIncludeMainline) {
-                                val tempDb = android.database.sqlite.SQLiteDatabase.openDatabase(
-                                    tempFile.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
-                                )
-                                val cursor = tempDb.query("main_lists", arrayOf("id"), "type='MAINLINE'", null, null, null, null)
-                                val mainlineIds = mutableListOf<Long>()
-                                while (cursor.moveToNext()) {
-                                    mainlineIds.add(cursor.getLong(0))
-                                }
-                                cursor.close()
-                                
-                                if (mainlineIds.isNotEmpty()) {
-                                    val idsStr = mainlineIds.joinToString(",")
-                                    AppLogger.i("导出：删除人生主线, ids=$idsStr")
-                                    tempDb.delete("mainline_items", "branchId IN (SELECT id FROM mainline_branches WHERE parentListId IN ($idsStr))", null)
-                                    tempDb.delete("mainline_branches", "parentListId IN ($idsStr)", null)
-                                    tempDb.delete("sub_lists", "parentListId IN ($idsStr)", null)
-                                    tempDb.delete("content_configs", "parentListId IN ($idsStr)", null)
-                                    tempDb.delete("option_buttons", "parentListId IN ($idsStr)", null)
-                                    tempDb.delete("rich_texts", "parentListId IN ($idsStr)", null)
-                                    tempDb.delete("quiz_cards", "groupId IN (SELECT id FROM quiz_groups WHERE parentListId IN ($idsStr))", null)
-                                    tempDb.delete("quiz_groups", "parentListId IN ($idsStr)", null)
-                                    tempDb.delete("main_lists", "type='MAINLINE'", null)
-                                }
-                                tempDb.close()
-                            }
-                            
-                            // 导出临时文件
+                            // 导出临时文件到SAF uri
                             context.contentResolver.openOutputStream(uri)?.use { output ->
-                                tempFile.inputStream().use { input ->
+                                fukeFile.inputStream().use { input ->
                                     input.copyTo(output)
                                 }
                             }
-                            tempFile.delete()
+                            fukeFile.delete()
                             AppLogger.i("导出：成功")
                             
                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -289,43 +258,88 @@ fun SettingsScreen(
                 contract = ActivityResultContracts.OpenDocument()
             ) { uri ->
                 uri?.let {
-                    // 开始校验
-                    importState = ImportState.Validating
-                    try {
-                        AppLogger.d("导入：开始校验，uri=$it")
-                        val result = DatabaseImportMerger.validateSchema(context, it)
-                        AppLogger.d("导入：校验结果 similarity=${result.similarity}, matchedTables=${result.matchedTables}, missingTables=${result.missingTables}, fieldMatchRatio=${result.fieldMatchRatio}, hasMainline=${result.hasMainline}")
-                        when {
-                            result.similarity < 0.5f -> {
-                                // 不匹配
-                                importState = ImportState.Mismatch
-                            }
-                            result.similarity <= 0.8f -> {
-                                // 部分匹配，需要用户确认
-                                importState = ImportState.PartialMatch(
-                                    similarity = result.similarity,
-                                    matchedTables = result.matchedTables,
-                                    missingTables = result.missingTables,
-                                    uri = it
-                                )
-                            }
-                            else -> {
-                                // 高匹配度，检查人生主线冲突
-                                val currentHasMainline = uiState.lists.any { it.type == ListType.MAINLINE }
-                                if (result.hasMainline && currentHasMainline) {
-                                    // 两边都有人生主线，需要用户选择
-                                    importState = ImportState.MainlineConflict(uri = it)
-                                } else {
-                                    // 直接导入
-                                    performMerge(context, it) { newState ->
-                                        importState = newState
+                    // 判断文件类型：.fuke 还是 .db
+                    val fileName = it.lastPathSegment ?: ""
+                    val isFukeFile = fileName.endsWith(".fuke", ignoreCase = true)
+                    
+                    if (isFukeFile) {
+                        // .fuke 格式：使用 FukeBackupImporter
+                        importState = ImportState.Validating
+                        try {
+                            AppLogger.d("导入：开始校验 .fuke 文件，uri=$it")
+                            // 先将 .fuke 文件复制到临时目录
+                            val tempFukeFile = File(context.cacheDir, "import_temp_${System.currentTimeMillis()}.fuke")
+                            context.contentResolver.openInputStream(it)?.use { input ->
+                                tempFukeFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            } ?: throw IllegalStateException("无法读取导入文件")
+                            
+                            val validationResult = FukeBackupImporter.validateBackup(context, tempFukeFile)
+                            tempFukeFile.delete()
+                            
+                            AppLogger.d("导入：校验结果 similarity=${validationResult.similarity}, matchedTables=${validationResult.matchedTables}, missingTables=${validationResult.missingTables}, fieldMatchRatio=${validationResult.fieldMatchRatio}, hasMainline=${validationResult.hasMainline}")
+                            when {
+                                validationResult.similarity < 0.5f -> {
+                                    importState = ImportState.Mismatch
+                                }
+                                validationResult.similarity <= 0.8f -> {
+                                    importState = ImportState.PartialMatch(
+                                        similarity = validationResult.similarity,
+                                        matchedTables = validationResult.matchedTables,
+                                        missingTables = validationResult.missingTables,
+                                        uri = it
+                                    )
+                                }
+                                else -> {
+                                    val currentHasMainline = uiState.lists.any { it.type == ListType.MAINLINE }
+                                    if (validationResult.hasMainline && currentHasMainline) {
+                                        importState = ImportState.MainlineConflict(uri = it)
+                                    } else {
+                                        performFukeMerge(context, it) { newState ->
+                                            importState = newState
+                                        }
                                     }
                                 }
                             }
+                        } catch (e: Exception) {
+                            AppLogger.e("导入：校验异常 ${e.message}\n${e.stackTraceToString()}")
+                            importState = ImportState.Error("校验失败: ${e.message}")
                         }
-                    } catch (e: Exception) {
-                        AppLogger.e("导入：校验异常 ${e.message}\n${e.stackTraceToString()}")
-                        importState = ImportState.Error("校验失败: ${e.message}")
+                    } else {
+                        // .db 格式：保持原逻辑
+                        importState = ImportState.Validating
+                        try {
+                            AppLogger.d("导入：开始校验，uri=$it")
+                            val result = DatabaseImportMerger.validateSchema(context, it)
+                            AppLogger.d("导入：校验结果 similarity=${result.similarity}, matchedTables=${result.matchedTables}, missingTables=${result.missingTables}, fieldMatchRatio=${result.fieldMatchRatio}, hasMainline=${result.hasMainline}")
+                            when {
+                                result.similarity < 0.5f -> {
+                                    importState = ImportState.Mismatch
+                                }
+                                result.similarity <= 0.8f -> {
+                                    importState = ImportState.PartialMatch(
+                                        similarity = result.similarity,
+                                        matchedTables = result.matchedTables,
+                                        missingTables = result.missingTables,
+                                        uri = it
+                                    )
+                                }
+                                else -> {
+                                    val currentHasMainline = uiState.lists.any { it.type == ListType.MAINLINE }
+                                    if (result.hasMainline && currentHasMainline) {
+                                        importState = ImportState.MainlineConflict(uri = it)
+                                    } else {
+                                        performMerge(context, it) { newState ->
+                                            importState = newState
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            AppLogger.e("导入：校验异常 ${e.message}\n${e.stackTraceToString()}")
+                            importState = ImportState.Error("校验失败: ${e.message}")
+                        }
                     }
                 }
             }
@@ -349,7 +363,7 @@ fun SettingsScreen(
             val backupSubtitle = when {
                 importSubtitle.isNotEmpty() -> importSubtitle
                 backupMessage.isNotEmpty() -> backupMessage
-                else -> "导出/导入 .db 文件"
+                else -> "导出/导入 .fuke 文件"
             }
 
             SettingItem(
@@ -366,7 +380,7 @@ fun SettingsScreen(
                 AlertDialog(
                     onDismissRequest = { showBackupDialog = false },
                     title = { Text("数据备份与恢复") },
-                    text = { Text("导出：将当前数据保存为.db文件\n导入：从.db文件合并数据（追加方式，不会覆盖现有数据）") },
+                    text = { Text("导出：将当前数据保存为.fuke文件（含图片）\n导入：从.fuke或.db文件合并数据（追加方式，不会覆盖现有数据）") },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -378,7 +392,7 @@ fun SettingsScreen(
                                 } else {
                                     exportIncludeMainline = true
                                     val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                                    exportLauncher.launch("fuke_daily_backup_$dateStr.db")
+                                    exportLauncher.launch("fuke_daily_backup_$dateStr.fuke")
                                 }
                             }
                         ) {
@@ -391,7 +405,7 @@ fun SettingsScreen(
                                 showBackupDialog = false
                                 // 重置导入状态
                                 importState = ImportState.Idle
-                                importLauncher.launch(arrayOf("application/x-sqlite3", "*/*"))
+                                importLauncher.launch(arrayOf("application/octet-stream", "application/x-sqlite3", "*/*"))
                             }
                         ) {
                             Text("导入")
@@ -412,7 +426,7 @@ fun SettingsScreen(
                                 showExportMainlineDialog = false
                                 exportIncludeMainline = true
                                 val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                                exportLauncher.launch("fuke_daily_backup_$dateStr.db")
+                                exportLauncher.launch("fuke_daily_backup_$dateStr.fuke")
                             }
                         ) {
                             Text("包含")
@@ -424,7 +438,7 @@ fun SettingsScreen(
                                 showExportMainlineDialog = false
                                 exportIncludeMainline = false
                                 val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                                exportLauncher.launch("fuke_daily_backup_$dateStr.db")
+                                exportLauncher.launch("fuke_daily_backup_$dateStr.fuke")
                             }
                         ) {
                             Text("不包含")
@@ -477,8 +491,16 @@ fun SettingsScreen(
                         confirmButton = {
                             TextButton(
                                 onClick = {
-                                    performMerge(context, state.uri) { newState ->
-                                        importState = newState
+                                    val fileName = state.uri.lastPathSegment ?: ""
+                                    val isFukeFile = fileName.endsWith(".fuke", ignoreCase = true)
+                                    if (isFukeFile) {
+                                        performFukeMerge(context, state.uri) { newState ->
+                                            importState = newState
+                                        }
+                                    } else {
+                                        performMerge(context, state.uri) { newState ->
+                                            importState = newState
+                                        }
                                     }
                                 }
                             ) {
@@ -550,9 +572,17 @@ fun SettingsScreen(
                         confirmButton = {
                             TextButton(
                                 onClick = {
-                                    // 覆盖：先删当前人生主线，再导入
-                                    performMerge(context, state.uri, overwriteMainline = true) { newState ->
-                                        importState = newState
+                                    // 判断文件类型，使用对应的合并方法
+                                    val fileName = state.uri.lastPathSegment ?: ""
+                                    val isFukeFile = fileName.endsWith(".fuke", ignoreCase = true)
+                                    if (isFukeFile) {
+                                        performFukeMerge(context, state.uri, overwriteMainline = true) { newState ->
+                                            importState = newState
+                                        }
+                                    } else {
+                                        performMerge(context, state.uri, overwriteMainline = true) { newState ->
+                                            importState = newState
+                                        }
                                     }
                                 }
                             ) {
@@ -562,9 +592,16 @@ fun SettingsScreen(
                         dismissButton = {
                             TextButton(
                                 onClick = {
-                                    // 不覆盖：跳过人生主线，导入其他数据
-                                    performMerge(context, state.uri, overwriteMainline = false) { newState ->
-                                        importState = newState
+                                    val fileName = state.uri.lastPathSegment ?: ""
+                                    val isFukeFile = fileName.endsWith(".fuke", ignoreCase = true)
+                                    if (isFukeFile) {
+                                        performFukeMerge(context, state.uri, overwriteMainline = false) { newState ->
+                                            importState = newState
+                                        }
+                                    } else {
+                                        performMerge(context, state.uri, overwriteMainline = false) { newState ->
+                                            importState = newState
+                                        }
                                     }
                                 }
                             ) {
@@ -601,6 +638,44 @@ private fun performMerge(
         }
     } catch (e: Exception) {
         AppLogger.e("导入：合并异常 ${e.message}\n${e.stackTraceToString()}")
+        onStateUpdate(ImportState.Error("合并失败: ${e.message}"))
+    }
+}
+
+/**
+ * 执行 .fuke 格式的合并操作
+ */
+private fun performFukeMerge(
+    context: Context,
+    uri: Uri,
+    overwriteMainline: Boolean = true,
+    onStateUpdate: (ImportState) -> Unit,
+) {
+    onStateUpdate(ImportState.Merging)
+    try {
+        AppLogger.d("导入：开始 .fuke 合并数据, overwriteMainline=$overwriteMainline")
+        // 将 .fuke 文件复制到临时目录
+        val tempFukeFile = File(context.cacheDir, "import_merge_temp_${System.currentTimeMillis()}.fuke")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            tempFukeFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        } ?: throw IllegalStateException("无法读取导入文件")
+
+        // 解压
+        val extracted = FukeBackupImporter.extractBackup(context, tempFukeFile)
+        tempFukeFile.delete()
+
+        // 导入
+        val result = FukeBackupImporter.importBackup(context, extracted, overwriteMainline)
+        AppLogger.d("导入：.fuke 合并结果 success=${result.success}, counts=${result.importedCounts}, error=${result.error}")
+        if (result.success) {
+            onStateUpdate(ImportState.Success(result.importedCounts))
+        } else {
+            onStateUpdate(ImportState.Error(result.error ?: "未知错误"))
+        }
+    } catch (e: Exception) {
+        AppLogger.e("导入：.fuke 合并异常 ${e.message}\n${e.stackTraceToString()}")
         onStateUpdate(ImportState.Error("合并失败: ${e.message}"))
     }
 }

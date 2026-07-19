@@ -82,7 +82,7 @@ fun SelectionConfigScreen(
             // 将图片复制到内部存储，避免 Content URI 过期
             try {
                 val inputStream = context.contentResolver.openInputStream(selectedUri)
-                val fileName = "sublist_${imageSelectSubListId}_${System.currentTimeMillis()}.jpg"
+                val fileName = "Fuker_${java.text.SimpleDateFormat("yyyyMMddHHmmssSSS", java.util.Locale.US).format(System.currentTimeMillis())}_${(1000..9999).random()}.jpg"
                 val destFile = java.io.File(context.filesDir, "images/$fileName")
                 destFile.parentFile?.mkdirs()
                 inputStream?.use { input ->

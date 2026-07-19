@@ -275,7 +275,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     
     val exportProjectLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/x-sqlite3")
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         uri?.let {
             val mainListId = pendingExportMainListId ?: return@let
@@ -286,8 +286,8 @@ fun HomeScreen(
                         // 关闭数据库，触发WAL checkpoint
                         viewModel.closeDatabaseForCheckpoint()
                         Thread.sleep(300)
-                        // 导出项目数据
-                        viewModel.exportProject(mainListId, context)
+                        // 使用 FukeBackupExporter 导出 .fuke 文件
+                        com.fuke.daily.util.FukeBackupExporter.exportProjectBackup(context, mainListId)
                     }
                     // 写入SAF uri
                     withContext(Dispatchers.IO) {
@@ -332,10 +332,10 @@ fun HomeScreen(
                 viewModel.dismissItemActionDialog()
             },
             onExport = {
-                // 构建文件名：项目名_备份_日期.db
+                // 构建文件名：项目名_备份_日期.fuke
                 val dateStr = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault())
                     .format(java.util.Date())
-                val fileName = "${actionItem.name}_备份_${dateStr}.db"
+                val fileName = "${actionItem.name}_备份_${dateStr}.fuke"
                 exportProjectLauncher.launch(fileName)
                 pendingExportMainListId = actionItem.id
                 viewModel.dismissItemActionDialog()

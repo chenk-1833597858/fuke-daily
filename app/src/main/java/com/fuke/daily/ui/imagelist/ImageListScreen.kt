@@ -124,7 +124,7 @@ fun ImageListScreen(
                 try {
                     // 复制裁剪后的图片到内部存储
                     context.contentResolver.openInputStream(cropUri)?.use { input ->
-                        val destFile = java.io.File(context.filesDir, "images/${System.currentTimeMillis()}.jpg")
+                        val destFile = java.io.File(context.filesDir, "images/Fuker_${java.text.SimpleDateFormat("yyyyMMddHHmmssSSS", java.util.Locale.US).format(System.currentTimeMillis())}_${(1000..9999).random()}.jpg")
                         destFile.parentFile?.mkdirs()
                         destFile.outputStream().use { output ->
                             input.copyTo(output)
